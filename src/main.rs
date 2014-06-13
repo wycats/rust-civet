@@ -1,4 +1,6 @@
 #![feature(macro_rules)]
+#![feature(phase)]
+#[phase(plugin, link)] extern crate log;
 
 extern crate libc;
 extern crate debug;
@@ -8,16 +10,18 @@ extern crate collections;
 use std::io::IoResult;
 use civet::{Config,Server,Request,Response};
 
+mod civet;
+
 macro_rules! http_write(
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
         try!(write!($dst, concat!($fmt, "\r\n") $($arg)*))
     )
 )
 
-mod civet;
-
 fn main() {
     let _ = Server::start(Config { port: 8888, threads: 10 }, handler);
+
+    debug!("Server started");
 
     loop {
         std::io::timer::sleep(1000);
