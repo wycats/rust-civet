@@ -5,7 +5,7 @@ use std::io::IoResult;
 use libc::{c_void,c_char};
 use native;
 use civet;
-use civet::raw::{MgConnection,MgRequestInfo,Context};
+use civet::raw::{RawRequest,RequestInfo,Context};
 use civet::raw::{get_headers,get_header,headers_len,write_bytes,request_info};
 use civet::raw::WithCStrs;
 
@@ -28,8 +28,7 @@ pub struct Connection<'a> {
 }
 
 pub struct Request<'a> {
-    conn: &'a MgConnection,
-    request_info: &'a MgRequestInfo
+    conn: &'a RawRequest
 }
 
 impl<'a> Request<'a> {
@@ -42,31 +41,31 @@ impl<'a> Request<'a> {
     }
 
     pub fn method(&self) -> Option<String> {
-        self.request_info.request_method()
+        self.conn.request_method()
     }
 
     pub fn url(&self) -> Option<String> {
-        self.request_info.uri()
+        self.conn.uri()
     }
 
     pub fn http_version(&self) -> Option<String> {
-        self.request_info.http_version()
+        self.conn.http_version()
     }
 
     pub fn query_string(&self) -> Option<String> {
-        self.request_info.query_string()
+        self.conn.query_string()
     }
 
     pub fn remote_user(&self) -> Option<String> {
-        self.request_info.remote_user()
+        self.conn.remote_user()
     }
 
     pub fn remote_ip(&self) -> int {
-        self.request_info.remote_ip as int
+        self.conn.remote_ip() as int
     }
 
     pub fn is_ssl(&self) -> bool {
-        self.request_info.is_ssl
+        self.conn.is_ssl()
     }
 
     pub fn headers<'a>(&'a self) -> Headers<'a> {
@@ -75,21 +74,21 @@ impl<'a> Request<'a> {
 }
 
 pub struct Response<'a> {
-    conn: &'a MgConnection
+    conn: &'a RawRequest
 }
 
 impl<'a> Connection<'a> {
-    pub fn new<'a>(conn: &'a MgConnection) -> Result<Connection<'a>, String> {
+    pub fn new<'a>(conn: &'a RawRequest) -> Connection<'a> {
         match request_info(conn) {
             Ok(info) => {
-                let request = Request { conn: conn, request_info: info };
-                let response = Response { conn: conn };
-                Ok(Connection {
+                let request = Request::<'a> { conn: conn };
+                let response = Response::<'a> { conn: conn };
+                Connection::<'a> {
                     request: request,
                     response: response
-                })
+                }
             },
-            Err(err) => Err(err)
+            Err(err) => fail!(err)
         }
     }
 
@@ -116,7 +115,7 @@ impl<'a> Reader for Request<'a> {
 }
 
 pub struct Headers<'a> {
-    conn: &'a MgConnection
+    conn: &'a RawRequest
 }
 
 impl<'a> Headers<'a> {
@@ -130,12 +129,12 @@ impl<'a> Headers<'a> {
 }
 
 pub struct HeaderIterator<'a> {
-    conn: &'a MgConnection,
+    conn: &'a RawRequest,
     position: uint
 }
 
 impl<'a> HeaderIterator<'a> {
-    fn new<'a>(conn: &'a MgConnection) -> HeaderIterator<'a> {
+    fn new<'a>(conn: &'a RawRequest) -> HeaderIterator<'a> {
         HeaderIterator { conn: conn, position: 0 }
     }
 }
@@ -168,30 +167,15 @@ impl Server {
         let Config { port, threads } = options;
         let options = ["listening_ports".to_str(), port.to_str(), "num_threads".to_str(), threads.to_str()];
 
-        fn internal_handler(conn: *MgConnection, handler: *c_void) -> int {
-            let _ = Connection::new(unsafe { conn.to_option() }.unwrap()).map(|mut connection| {
-                let (tx, rx) = channel();
-                let handler: fn(&mut Request, &mut Response) -> IoResult<()> = unsafe { transmute(handler) };
-                let mut task = native::task::new((0, std::uint::MAX));
-
-                task.death.on_exit = Some(proc(r) tx.send(r));
-                task.run(|| {
-                    println!("Made it so far");
-                    let _ = handler(&mut connection.request, &mut connection.response);
-                    println!("Done");
-                });
-                let _ = rx.recv();
-            });
-
-            1
-        }
-
         let mut server = None;
 
         debug!("Starting server");
         options.with_c_strs(true, |options: **c_char| {
-            let mut context = civet::raw::start(unsafe { transmute(handler) }, options);
-            civet::raw::set_handler(&mut context, internal_handler, unsafe { transmute(handler) });
+            let mut context = civet::raw::start(|raw_request| {
+                let connection = Connection::new(raw_request);
+                handler(&mut connection.request, &mut connection.response);
+            }, options);
+
             server = Some(Server { context: context });
         });
         debug!("Done starting server");

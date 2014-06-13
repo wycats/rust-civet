@@ -19,7 +19,7 @@ macro_rules! http_write(
 )
 
 fn main() {
-    let _ = Server::start(Config { port: 8888, threads: 10 }, handler);
+    let _ = &Server::start(Config { port: 8888, threads: 10 }, handler);
 
     debug!("Server started");
 
