@@ -6,7 +6,7 @@ extern crate native;
 extern crate collections;
 
 use std::io::IoResult;
-use civet::{Config,Server,Connection};
+use civet::{Config,Server,Request,Response};
 
 macro_rules! http_write(
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
@@ -24,22 +24,28 @@ fn main() {
     }
 }
 
-fn handler(mut conn: Connection) -> IoResult<()> {
-    http_write!(conn, "HTTP/1.1 200 OK");
-    http_write!(conn, "Content-Type: text/html");
-    http_write!(conn, "");
-    http_write!(conn, "<p>Method: {}</p>", conn.method());
-    http_write!(conn, "<p>URL: {}</p>", conn.url());
-    http_write!(conn, "<p>HTTP: {}</p>", conn.http_version());
-    http_write!(conn, "<p>Remote IP: {}</p>", conn.remote_ip());
-    http_write!(conn, "<p>Remote User: {}</p>", conn.remote_user());
-    http_write!(conn, "<p>Query String: {}</p>", conn.query_string());
-    http_write!(conn, "<p>SSL?: {}</p>", conn.is_ssl());
-    http_write!(conn, "<p>Header Count: {}</p>", conn.count_headers());
-    http_write!(conn, "<p>User Agent: {}</p>", conn.headers().find("User-Agent"));
-    Ok(())
+fn handler(req: &mut Request, res: &mut Response) -> IoResult<()> {
+    http_write!(res, "HTTP/1.1 200 OK");
+    http_write!(res, "Content-Type: text/html");
+    http_write!(res, "");
+    http_write!(res, "<p>Method: {}</p>", req.method());
+    http_write!(res, "<p>URL: {}</p>", req.url());
+    http_write!(res, "<p>HTTP: {}</p>", req.http_version());
+    http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
+    http_write!(res, "<p>Remote User: {}</p>", req.remote_user());
+    http_write!(res, "<p>Query String: {}</p>", req.query_string());
+    http_write!(res, "<p>SSL?: {}</p>", req.is_ssl());
+    http_write!(res, "<p>Header Count: {}</p>", req.count_headers());
+    http_write!(res, "<p>User Agent: {}</p>", req.headers().find("User-Agent"));
+    http_write!(res, "<p>Input: {}</p>", try!(req.read_to_str()));
 
-    //for (key, value) in conn.headers().iter() {
-        //writeln!(conn, "<p>{} = {}</p>", key, value);
-    //}
+    http_write!(res, "<h2>Headers</h2><ul>");
+
+    for (key, value) in req.headers().iter() {
+        http_write!(res, "<li>{} = {}</li>", key, value);
+    }
+
+    http_write!(res, "</ul>");
+
+    Ok(())
 }

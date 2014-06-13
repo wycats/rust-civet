@@ -12,6 +12,7 @@ use native;
 extern {
     fn mg_start(callbacks: *MgCallbacks, user_data: *c_void, options: **c_char) -> *MgContext;
     fn mg_set_request_handler(context: *MgContext, uri: *c_char, handler: MgRequestHandler, data: *c_void);
+    fn mg_read(connection: *MgConnection, buf: *c_void, len: size_t) -> c_int;
     fn mg_write(connection: *MgConnection, data: *c_void, len: size_t) -> c_int;
     fn mg_get_header(connection: *MgConnection, name: *c_char) -> *c_char;
     fn mg_get_request_info(connection: *MgConnection) -> *MgRequestInfo;
@@ -92,18 +93,16 @@ impl Config {
 }
 
 pub struct Connection<'a> {
+    request: Request<'a>,
+    response: Response<'a>
+}
+
+pub struct Request<'a> {
     conn: &'a MgConnection,
     request_info: &'a MgRequestInfo
 }
 
-impl<'a> Connection<'a> {
-    pub fn new<'a>(conn: &'a MgConnection) -> Result<Connection<'a>, String> {
-        match request_info(conn) {
-            Ok(info) => Ok(Connection { conn: conn, request_info: info }),
-            Err(err) => Err(err)
-        }
-    }
-
+impl<'a> Request<'a> {
     pub fn get_header<S: Str>(&self, string: S) -> Option<String> {
         get_header(self.conn, string.as_slice())
     }
@@ -141,7 +140,7 @@ impl<'a> Connection<'a> {
     }
 
     pub fn headers<'a>(&'a self) -> Headers<'a> {
-        Headers { connection: self }
+        Headers { conn: self.conn }
     }
 
     fn info_to_str(&self, callback: |&MgRequestInfo| -> *c_char) -> Option<String> {
@@ -153,7 +152,28 @@ impl<'a> Connection<'a> {
     }
 }
 
-impl<'a> Writer for Connection<'a> {
+pub struct Response<'a> {
+    conn: &'a MgConnection
+}
+
+impl<'a> Connection<'a> {
+    pub fn new<'a>(conn: &'a MgConnection) -> Result<Connection<'a>, String> {
+        match request_info(conn) {
+            Ok(info) => {
+                let request = Request { conn: conn, request_info: info };
+                let response = Response { conn: conn };
+                Ok(Connection {
+                    request: request,
+                    response: response
+                })
+            },
+            Err(err) => Err(err)
+        }
+    }
+
+}
+
+impl<'a> Writer for Response<'a> {
     fn write(&mut self, buf: &[u8]) -> IoResult<()> {
         write_bytes(self.conn, buf).map_err(|_| {
             io::standard_error(io::IoUnavailable)
@@ -161,28 +181,40 @@ impl<'a> Writer for Connection<'a> {
     }
 }
 
+impl<'a> Reader for Request<'a> {
+    fn read(&mut self, buf: &mut[u8]) -> IoResult<uint> {
+        let ret = unsafe { mg_read(self.conn, buf.as_ptr() as *c_void, buf.len() as u64) };
+
+        if ret == 0 {
+            Err(io::standard_error(io::EndOfFile))
+        } else {
+            Ok(ret as uint)
+        }
+    }
+}
+
 pub struct Headers<'a> {
-    connection: &'a Connection<'a>
+    conn: &'a MgConnection
 }
 
 impl<'a> Headers<'a> {
     pub fn find<S: Str>(&self, string: S) -> Option<String> {
-        self.connection.get_header(string)
+        get_header(self.conn, string.as_slice())
     }
 
     pub fn iter<'a>(&'a self) -> HeaderIterator<'a> {
-        HeaderIterator::new(self.connection)
+        HeaderIterator::new(self.conn)
     }
 }
 
 pub struct HeaderIterator<'a> {
-    connection: &'a Connection<'a>,
+    conn: &'a MgConnection,
     position: uint
 }
 
 impl<'a> HeaderIterator<'a> {
-    fn new<'a>(connection: &'a Connection) -> HeaderIterator<'a> {
-        HeaderIterator { connection: connection, position: 0 }
+    fn new<'a>(conn: &'a MgConnection) -> HeaderIterator<'a> {
+        HeaderIterator { conn: conn, position: 0 }
     }
 }
 
@@ -190,7 +222,7 @@ impl<'a> Iterator<(String, String)> for HeaderIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         let pos = self.position;
 
-        match get_headers(self.connection.conn).ok() {
+        match get_headers(self.conn).ok() {
             Some(headers) => {
                 let header = headers[pos];
 
@@ -215,18 +247,22 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn start(options: Config, handler: fn(Connection) -> IoResult<()>) -> IoResult<Server> {
+    pub fn start(options: Config, handler: fn(&mut Request, &mut Response) -> IoResult<()>) -> IoResult<Server> {
         let Config { port, threads } = options;
         let options = ["listening_ports".to_str(), port.to_str(), "num_threads".to_str(), threads.to_str()];
 
         fn internal_handler(conn: *MgConnection, handler: *c_void) -> int {
-            let _ = Connection::new(unsafe { conn.to_option() }.unwrap()).map(|connection| {
+            let _ = Connection::new(unsafe { conn.to_option() }.unwrap()).map(|mut connection| {
                 let (tx, rx) = channel();
-                let handler: fn(Connection) -> IoResult<()> = unsafe { transmute(handler) };
+                let handler: fn(&mut Request, &mut Response) -> IoResult<()> = unsafe { transmute(handler) };
                 let mut task = native::task::new((0, std::uint::MAX));
 
                 task.death.on_exit = Some(proc(r) tx.send(r));
-                task.run(|| { println!("Made it so far"); let _ = handler(connection); println!("Done"); });
+                task.run(|| {
+                    println!("Made it so far");
+                    let _ = handler(&mut connection.request, &mut connection.response);
+                    println!("Done");
+                });
                 let _ = rx.recv();
             });
 
