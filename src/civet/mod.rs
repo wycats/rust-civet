@@ -2,7 +2,6 @@ use std::io;
 use std::io::IoResult;
 
 use civet;
-use civet::raw::{MgConnection};
 use civet::raw::{RequestInfo,Header};
 use civet::raw::{get_header,get_headers,get_request_info};
 
@@ -16,12 +15,12 @@ pub struct Connection<'a> {
 }
 
 pub struct Request<'a> {
-    conn: &'a MgConnection,
+    conn: &'a civet::raw::Connection,
     request_info: RequestInfo<'a>
 }
 
 impl<'a> Request<'a> {
-    pub fn get_header<S: Str>(&self, string: S) -> Option<String> {
+    pub fn get_header<S: Str>(&mut self, string: S) -> Option<String> {
         get_header(self.conn, string.as_slice())
     }
 
@@ -67,11 +66,11 @@ impl<'a> Request<'a> {
 }
 
 pub struct Response<'a> {
-    conn: &'a MgConnection
+    conn: &'a civet::raw::Connection
 }
 
 impl<'a> Connection<'a> {
-    pub fn new<'a>(conn: &'a MgConnection) -> Result<Connection<'a>, String> {
+    pub fn new<'a>(conn: &'a civet::raw::Connection) -> Result<Connection<'a>, String> {
         match request_info(conn) {
             Ok(info) => {
                 let request = Request { conn: conn, request_info: info };
@@ -108,7 +107,7 @@ impl<'a> Reader for Request<'a> {
 }
 
 pub struct Headers<'a> {
-    conn: &'a MgConnection
+    conn: &'a civet::raw::Connection
 }
 
 impl<'a> Headers<'a> {
@@ -127,7 +126,7 @@ pub struct HeaderIterator<'a> {
 }
 
 impl<'a> HeaderIterator<'a> {
-    fn new<'a>(conn: &'a MgConnection) -> HeaderIterator<'a> {
+    fn new<'a>(conn: &'a civet::raw::Connection) -> HeaderIterator<'a> {
         HeaderIterator { headers: get_headers(conn), position: 0 }
     }
 }
@@ -154,7 +153,7 @@ pub struct Server(civet::raw::Server);
 
 impl Server {
     pub fn start(options: Config, handler: ServerHandler) -> IoResult<Server> {
-        fn internal_handler(conn: &mut MgConnection, callback: &ServerHandler) -> Result<(), ()> {
+        fn internal_handler(conn: &mut civet::raw::Connection, callback: &ServerHandler) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             (*callback)(&mut connection.request, &mut connection.response).map_err(|_| ())
         }
@@ -164,7 +163,7 @@ impl Server {
     }
 }
 
-fn write_bytes(connection: &MgConnection, bytes: &[u8]) -> Result<(), String> {
+fn write_bytes(connection: &civet::raw::Connection, bytes: &[u8]) -> Result<(), String> {
     let ret = civet::raw::write(connection, bytes);
 
     if ret == -1 {
@@ -174,7 +173,7 @@ fn write_bytes(connection: &MgConnection, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn request_info<'a>(connection: &'a MgConnection) -> Result<RequestInfo<'a>, String> {
+fn request_info<'a>(connection: &'a civet::raw::Connection) -> Result<RequestInfo<'a>, String> {
     match get_request_info(connection) {
         Some(info) => Ok(info),
         None => Err("Couldn't get request info for connection".to_str())
