@@ -1,31 +1,14 @@
-use std;
-use std::mem::transmute;
-use std::ptr::null;
 use std::io;
 use std::io::IoResult;
-use std::c_str::CString;
-use libc;
-use libc::{c_void,c_char};
-use native;
 
 use civet;
-use civet::raw::{MgContext,MgConnection};
-use civet::raw::{mg_set_request_handler};
+use civet::raw::{MgConnection};
 use civet::raw::{RequestInfo,Header};
 use civet::raw::{get_header,get_headers,get_request_info};
 
+pub use civet::raw::Config;
+
 mod raw;
-
-pub struct Config {
-    pub port: uint,
-    pub threads: uint
-}
-
-impl Config {
-    pub fn default() -> Config {
-        Config { port: 8888, threads: 50 }
-    }
-}
 
 pub struct Connection<'a> {
     request: Request<'a>,
@@ -42,8 +25,8 @@ impl<'a> Request<'a> {
         get_header(self.conn, string.as_slice())
     }
 
-    pub fn count_headers(&self) -> Result<uint, String> {
-        headers_len(self.conn)
+    pub fn count_headers(&self) -> uint {
+        self.request_info.num_headers() as uint
     }
 
     pub fn method(&self) -> Option<String> {
@@ -68,6 +51,10 @@ impl<'a> Request<'a> {
 
     pub fn remote_ip(&self) -> int {
         self.request_info.remote_ip()
+    }
+
+    pub fn remote_port(&self) -> int {
+        self.request_info.remote_port()
     }
 
     pub fn is_ssl(&self) -> bool {
@@ -160,47 +147,22 @@ impl<'a> Iterator<(String, String)> for HeaderIterator<'a> {
     }
 }
 
+type ServerHandler = fn(&mut Request, &mut Response) -> IoResult<()>;
+
 #[allow(dead_code)]
-pub struct Server {
-    context: *MgContext,
-}
+pub struct Server(civet::raw::Server);
 
 impl Server {
-    pub fn start(options: Config, handler: fn(&mut Request, &mut Response) -> IoResult<()>) -> IoResult<Server> {
-        let Config { port, threads } = options;
-        let options = ["listening_ports".to_str(), port.to_str(), "num_threads".to_str(), threads.to_str()];
-
-        fn internal_handler(conn: *MgConnection, handler: *c_void) -> int {
-            let _ = Connection::new(unsafe { conn.to_option() }.unwrap()).map(|mut connection| {
-                let (tx, rx) = channel();
-                let handler: fn(&mut Request, &mut Response) -> IoResult<()> = unsafe { transmute(handler) };
-                let mut task = native::task::new((0, std::uint::MAX));
-
-                task.death.on_exit = Some(proc(r) tx.send(r));
-                task.run(|| {
-                    println!("Made it so far");
-                    let _ = handler(&mut connection.request, &mut connection.response);
-                    println!("Done");
-                });
-                let _ = rx.recv();
-            });
-
-            1
+    pub fn start(options: Config, handler: ServerHandler) -> IoResult<Server> {
+        fn internal_handler(conn: &mut MgConnection, callback: &ServerHandler) -> Result<(), ()> {
+            let mut connection = Connection::new(conn).unwrap();
+            (*callback)(&mut connection.request, &mut connection.response).map_err(|_| ())
         }
 
-        let mut server = None;
-
-        options.with_c_strs(true, |options: **c_char| {
-            let context = unsafe { civet::raw::start(transmute(handler), options) };
-            server = Some(Server { context: context });
-
-            unsafe { mg_set_request_handler(context, "**".to_c_str().unwrap(), internal_handler, transmute(handler)) };
-        });
-
-        Ok(server.unwrap())
+        let raw_callback = civet::raw::ServerCallback::new(internal_handler, handler);
+        Ok(Server(civet::raw::Server::start(options, raw_callback)))
     }
 }
-
 
 fn write_bytes(connection: &MgConnection, bytes: &[u8]) -> Result<(), String> {
     let ret = civet::raw::write(connection, bytes);
@@ -212,11 +174,6 @@ fn write_bytes(connection: &MgConnection, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-
-fn headers_len<'a>(connection: &'a MgConnection) -> Result<uint, String> {
-    request_info(connection).map(|info| info.as_ref().num_headers as uint)
-}
-
 fn request_info<'a>(connection: &'a MgConnection) -> Result<RequestInfo<'a>, String> {
     match get_request_info(connection) {
         Some(info) => Ok(info),
@@ -224,17 +181,3 @@ fn request_info<'a>(connection: &'a MgConnection) -> Result<RequestInfo<'a>, Str
     }
 }
 
-trait WithCStrs {
-    fn with_c_strs(&self, null_terminated: bool, f: |**libc::c_char|) ;
-}
-
-impl<'a, T: ToCStr> WithCStrs for &'a [T] {
-    fn with_c_strs(&self, null_terminate: bool, f: |**c_char|) {
-        let c_strs: Vec<CString> = self.iter().map(|s: &T| s.to_c_str()).collect();
-        let mut ptrs: Vec<*c_char> = c_strs.iter().map(|c: &CString| c.with_ref(|ptr| ptr)).collect();
-        if null_terminate {
-            ptrs.push(null());
-        }
-        f(ptrs.as_ptr())
-    }
-}
