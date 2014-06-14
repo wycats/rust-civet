@@ -10,7 +10,8 @@ use native;
 
 use civet;
 use civet::raw::{MgContext,MgConnection,MgHeader,MgRequestInfo};
-use civet::raw::{mg_set_request_handler,mg_read,mg_write,mg_get_header,mg_get_request_info};
+use civet::raw::{mg_set_request_handler};
+use civet::raw::{get_header,get_request_info};
 
 mod raw;
 
@@ -216,21 +217,14 @@ impl Server {
 }
 
 
-fn write_bytes(connection: *MgConnection, bytes: &[u8]) -> Result<(), String> {
-    let c_bytes = bytes.as_ptr() as *c_void;
-    let ret = unsafe { mg_write(connection, c_bytes, bytes.len() as u64) };
+fn write_bytes(connection: &MgConnection, bytes: &[u8]) -> Result<(), String> {
+    let ret = civet::raw::write(connection, bytes);
 
     if ret == -1 {
         return Err("Couldn't write bytes to the connection".to_str())
     }
 
     Ok(())
-}
-
-fn get_header<'a>(connection: &'a MgConnection, string: &str) -> Option<String> {
-    let cstr = unsafe { mg_get_header(connection, string.to_c_str().unwrap()).to_option() };
-
-    cstr.map(|c| unsafe { CString::new(c, false) }.as_str().to_str())
 }
 
 fn to_str(string: *c_char) -> Option<String> {
@@ -252,13 +246,9 @@ fn to_str(string: *c_char) -> Option<String> {
 }
 
 fn get_headers<'a>(connection: &'a MgConnection) -> Result<[MgHeader, ..64], String> {
-    let request_info = unsafe { mg_get_request_info(connection) };
-
-    if request_info.is_null() {
-        Err("Couldn't get request info for connection".to_str())
-    } else {
-        let info = unsafe { *request_info };
-        Ok(info.headers)
+    match get_request_info(connection) {
+        Some(info) => Ok(info.headers),
+        None => Err("Couldn't get request info for connection".to_str())
     }
 }
 
@@ -268,12 +258,9 @@ fn headers_len<'a>(connection: &'a MgConnection) -> Result<uint, String> {
 }
 
 fn request_info<'a>(connection: &'a MgConnection) -> Result<&'a MgRequestInfo, String> {
-    let request_info = unsafe { mg_get_request_info(connection) };
-
-    if request_info.is_null() {
-        Err("Couldn't get request info for connection".to_str())
-    } else {
-        Ok(unsafe { transmute(request_info) })
+    match get_request_info(connection) {
+        Some(info) => Ok(info),
+        None => Err("Couldn't get request info for connection".to_str())
     }
 }
 

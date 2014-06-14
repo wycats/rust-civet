@@ -1,13 +1,14 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
+use std::c_str::CString;
 use std::ptr::null;
 
 #[link(name="civetweb")]
 extern {
     fn mg_start(callbacks: *MgCallbacks, user_data: *c_void, options: **c_char) -> *MgContext;
     pub fn mg_set_request_handler(context: *MgContext, uri: *c_char, handler: MgRequestHandler, data: *c_void);
-    pub fn mg_read(connection: *MgConnection, buf: *c_void, len: size_t) -> c_int;
-    pub fn mg_write(connection: *MgConnection, data: *c_void, len: size_t) -> c_int;
-    pub fn mg_get_header(connection: *MgConnection, name: *c_char) -> *c_char;
+    fn mg_read(connection: *MgConnection, buf: *c_void, len: size_t) -> c_int;
+    fn mg_write(connection: *MgConnection, data: *c_void, len: size_t) -> c_int;
+    fn mg_get_header(connection: *MgConnection, name: *c_char) -> *c_char;
     pub fn mg_get_request_info(connection: *MgConnection) -> *MgRequestInfo;
 }
 
@@ -81,4 +82,19 @@ pub fn start(handler: *c_void, options: **c_char) -> *MgContext {
 
 pub fn read(conn: *MgConnection, buf: &mut [u8]) -> i32 {
     unsafe { mg_read(conn, buf.as_ptr() as *c_void, buf.len() as u64) }
+}
+
+pub fn write(conn: *MgConnection, bytes: &[u8]) -> i32 {
+    let c_bytes = bytes.as_ptr() as *c_void;
+    unsafe { mg_write(conn, c_bytes, bytes.len() as u64) }
+}
+
+pub fn get_header(conn: *MgConnection, string: &str) -> Option<String> {
+    let cstr = unsafe { mg_get_header(conn, string.to_c_str().unwrap()).to_option() };
+
+    cstr.map(|c| unsafe { CString::new(c, false) }.as_str().to_str())
+}
+
+pub fn get_request_info<'a>(conn: &'a MgConnection) -> Option<&'a MgRequestInfo> {
+    unsafe { mg_get_request_info(conn).to_option() }
 }
