@@ -23,6 +23,22 @@ pub struct MgHeader {
     pub value: *c_char
 }
 
+pub struct Header<'a>(*MgHeader);
+
+impl<'a> Header<'a> {
+    fn as_ref<'a>(&'a self) -> &'a MgHeader {
+        match *self { Header(header) => unsafe { &*header } }
+    }
+
+    pub fn name(&self) -> Option<String> {
+        to_str(self.as_ref().name)
+    }
+
+    pub fn value(&self) -> Option<String> {
+        to_str(self.as_ref().value)
+    }
+}
+
 pub struct MgRequestInfo {
     pub request_method: *c_char,
     pub uri: *c_char,
@@ -33,7 +49,9 @@ pub struct MgRequestInfo {
     pub remote_port: c_int,
     pub is_ssl: bool,
 
+    #[allow(dead_code)]
     user_data: *c_void,
+    #[allow(dead_code)]
     conn_data: *c_void,
 
     pub num_headers: c_int,
@@ -43,10 +61,6 @@ pub struct MgRequestInfo {
 pub struct RequestInfo<'a>(*MgRequestInfo);
 
 impl<'a> RequestInfo<'a> {
-    pub fn unwrap(&self) -> *MgRequestInfo {
-        match *self { RequestInfo(info) => info }
-    }
-
     pub fn as_ref<'a>(&'a self) -> &'a MgRequestInfo {
         match *self { RequestInfo(info) => unsafe { &*info } }
     }
@@ -154,4 +168,11 @@ pub fn get_header(conn: *MgConnection, string: &str) -> Option<String> {
 
 pub fn get_request_info<'a>(conn: &'a MgConnection) -> Option<RequestInfo<'a>> {
     (unsafe { mg_get_request_info(conn).to_option() }).map(|info| RequestInfo(info))
+}
+
+pub fn get_headers<'a>(conn: &'a MgConnection) -> Vec<Header<'a>> {
+    match get_request_info(conn) {
+        Some(info) => info.as_ref().headers.iter().map(|h| Header(h)).collect(),
+        None => vec!()
+    }
 }

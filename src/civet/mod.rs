@@ -9,10 +9,10 @@ use libc::{c_void,c_char};
 use native;
 
 use civet;
-use civet::raw::{MgContext,MgConnection,MgHeader,MgRequestInfo};
+use civet::raw::{MgContext,MgConnection};
 use civet::raw::{mg_set_request_handler};
-use civet::raw::{RequestInfo};
-use civet::raw::{get_header,get_request_info};
+use civet::raw::{RequestInfo,Header};
+use civet::raw::{get_header,get_headers,get_request_info};
 
 mod raw;
 
@@ -135,35 +135,27 @@ impl<'a> Headers<'a> {
 }
 
 pub struct HeaderIterator<'a> {
-    conn: &'a MgConnection,
+    headers: Vec<Header<'a>>,
     position: uint
 }
 
 impl<'a> HeaderIterator<'a> {
     fn new<'a>(conn: &'a MgConnection) -> HeaderIterator<'a> {
-        HeaderIterator { conn: conn, position: 0 }
+        HeaderIterator { headers: get_headers(conn), position: 0 }
     }
 }
 
 impl<'a> Iterator<(String, String)> for HeaderIterator<'a> {
     fn next(&mut self) -> Option<(String, String)> {
         let pos = self.position;
+        let headers = &self.headers;
 
-        match get_headers(self.conn).ok() {
-            Some(headers) => {
-                let header = headers[pos];
-
-                if header.name.is_null() {
-                    return None;
-                }
-
-                self.position += 1;
-
-                to_str(header.name).map(|name| {
-                    (name, to_str(header.value).unwrap())
-                })
-            },
-            None => None
+        if headers.len() <= pos {
+            None
+        } else {
+            let header = headers.get(pos);
+            self.position += 1;
+            header.name().map(|name| (name, header.value().unwrap()))
         }
     }
 }
@@ -220,27 +212,6 @@ fn write_bytes(connection: &MgConnection, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn to_str(string: *c_char) -> Option<String> {
-    unsafe {
-        match string.to_option() {
-            None => None,
-            Some(c) => {
-                if *string == 0 {
-                    return None;
-                }
-
-                match CString::new(c, false).as_str() {
-                    Some(s) => Some(s.to_str()),
-                    None => None
-                }
-            }
-        }
-    }
-}
-
-fn get_headers<'a>(connection: &'a MgConnection) -> Result<[MgHeader, ..64], String> {
-    request_info(connection).map(|info| info.as_ref().headers)
-}
 
 fn headers_len<'a>(connection: &'a MgConnection) -> Result<uint, String> {
     request_info(connection).map(|info| info.as_ref().num_headers as uint)
