@@ -9,7 +9,7 @@ extern {
     fn mg_read(connection: *MgConnection, buf: *c_void, len: size_t) -> c_int;
     fn mg_write(connection: *MgConnection, data: *c_void, len: size_t) -> c_int;
     fn mg_get_header(connection: *MgConnection, name: *c_char) -> *c_char;
-    pub fn mg_get_request_info(connection: *MgConnection) -> *MgRequestInfo;
+    fn mg_get_request_info(connection: *MgConnection) -> *MgRequestInfo;
 }
 
 pub enum MgContext {}
@@ -23,7 +23,6 @@ pub struct MgHeader {
     pub value: *c_char
 }
 
-#[allow(dead_code)]
 pub struct MgRequestInfo {
     pub request_method: *c_char,
     pub uri: *c_char,
@@ -39,6 +38,46 @@ pub struct MgRequestInfo {
 
     pub num_headers: c_int,
     pub headers: [MgHeader, ..64]
+}
+
+pub struct RequestInfo<'a>(*MgRequestInfo);
+
+impl<'a> RequestInfo<'a> {
+    pub fn unwrap(&self) -> *MgRequestInfo {
+        match *self { RequestInfo(info) => info }
+    }
+
+    pub fn as_ref<'a>(&'a self) -> &'a MgRequestInfo {
+        match *self { RequestInfo(info) => unsafe { &*info } }
+    }
+
+    pub fn method(&self) -> Option<String> {
+        to_str(self.as_ref().request_method)
+    }
+
+    pub fn url(&self) -> Option<String> {
+        to_str(self.as_ref().uri)
+    }
+
+    pub fn http_version(&self) -> Option<String> {
+        to_str(self.as_ref().http_version)
+    }
+
+    pub fn query_string(&self) -> Option<String> {
+        to_str(self.as_ref().query_string)
+    }
+
+    pub fn remote_user(&self) -> Option<String> {
+        to_str(self.as_ref().remote_user)
+    }
+
+    pub fn remote_ip(&self) -> int {
+        self.as_ref().remote_ip as int
+    }
+
+    pub fn is_ssl(&self) -> bool {
+        self.as_ref().is_ssl
+    }
 }
 
 #[allow(dead_code)]
@@ -76,6 +115,24 @@ impl MgCallbacks {
     }
 }
 
+fn to_str(string: *c_char) -> Option<String> {
+    unsafe {
+        match string.to_option() {
+            None => None,
+            Some(c) => {
+                if *string == 0 {
+                    return None;
+                }
+
+                match CString::new(c, false).as_str() {
+                    Some(s) => Some(s.to_str()),
+                    None => None
+                }
+            }
+        }
+    }
+}
+
 pub fn start(handler: *c_void, options: **c_char) -> *MgContext {
     unsafe { mg_start(&MgCallbacks::new(), handler, options) }
 }
@@ -95,6 +152,6 @@ pub fn get_header(conn: *MgConnection, string: &str) -> Option<String> {
     cstr.map(|c| unsafe { CString::new(c, false) }.as_str().to_str())
 }
 
-pub fn get_request_info<'a>(conn: &'a MgConnection) -> Option<&'a MgRequestInfo> {
-    unsafe { mg_get_request_info(conn).to_option() }
+pub fn get_request_info<'a>(conn: &'a MgConnection) -> Option<RequestInfo<'a>> {
+    (unsafe { mg_get_request_info(conn).to_option() }).map(|info| RequestInfo(info))
 }

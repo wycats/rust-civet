@@ -11,6 +11,7 @@ use native;
 use civet;
 use civet::raw::{MgContext,MgConnection,MgHeader,MgRequestInfo};
 use civet::raw::{mg_set_request_handler};
+use civet::raw::{RequestInfo};
 use civet::raw::{get_header,get_request_info};
 
 mod raw;
@@ -33,7 +34,7 @@ pub struct Connection<'a> {
 
 pub struct Request<'a> {
     conn: &'a MgConnection,
-    request_info: &'a MgRequestInfo
+    request_info: RequestInfo<'a>
 }
 
 impl<'a> Request<'a> {
@@ -46,43 +47,35 @@ impl<'a> Request<'a> {
     }
 
     pub fn method(&self) -> Option<String> {
-        self.info_to_str(|i| i.request_method)
+        self.request_info.method()
     }
 
     pub fn url(&self) -> Option<String> {
-        self.info_to_str(|i| i.uri)
+        self.request_info.url()
     }
 
     pub fn http_version(&self) -> Option<String> {
-        self.info_to_str(|i| i.http_version)
+        self.request_info.http_version()
     }
 
     pub fn query_string(&self) -> Option<String> {
-        self.info_to_str(|i| i.query_string)
+        self.request_info.query_string()
     }
 
     pub fn remote_user(&self) -> Option<String> {
-        self.info_to_str(|i| i.remote_user)
+        self.request_info.remote_user()
     }
 
     pub fn remote_ip(&self) -> int {
-        self.with_info(|i| i.remote_ip as int)
+        self.request_info.remote_ip()
     }
 
     pub fn is_ssl(&self) -> bool {
-        self.with_info(|i| i.is_ssl)
+        self.request_info.is_ssl()
     }
 
     pub fn headers<'a>(&'a self) -> Headers<'a> {
         Headers { conn: self.conn }
-    }
-
-    fn info_to_str(&self, callback: |&MgRequestInfo| -> *c_char) -> Option<String> {
-        to_str(callback(self.request_info))
-    }
-
-    fn with_info<T>(&self, callback: |&MgRequestInfo| -> T) -> T {
-        callback(self.request_info)
     }
 }
 
@@ -246,18 +239,14 @@ fn to_str(string: *c_char) -> Option<String> {
 }
 
 fn get_headers<'a>(connection: &'a MgConnection) -> Result<[MgHeader, ..64], String> {
-    match get_request_info(connection) {
-        Some(info) => Ok(info.headers),
-        None => Err("Couldn't get request info for connection".to_str())
-    }
+    request_info(connection).map(|info| info.as_ref().headers)
 }
 
 fn headers_len<'a>(connection: &'a MgConnection) -> Result<uint, String> {
-    let info = try!(request_info(connection));
-    Ok(info.num_headers as uint)
+    request_info(connection).map(|info| info.as_ref().num_headers as uint)
 }
 
-fn request_info<'a>(connection: &'a MgConnection) -> Result<&'a MgRequestInfo, String> {
+fn request_info<'a>(connection: &'a MgConnection) -> Result<RequestInfo<'a>, String> {
     match get_request_info(connection) {
         Some(info) => Ok(info),
         None => Err("Couldn't get request info for connection".to_str())
