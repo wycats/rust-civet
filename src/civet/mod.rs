@@ -5,81 +5,14 @@ use std::io;
 use std::io::IoResult;
 use std::c_str::CString;
 use libc;
-use libc::{c_void,c_char,c_int,c_long,size_t};
+use libc::{c_void,c_char};
 use native;
 
-#[link(name="civetweb")]
-extern {
-    fn mg_start(callbacks: *MgCallbacks, user_data: *c_void, options: **c_char) -> *MgContext;
-    fn mg_set_request_handler(context: *MgContext, uri: *c_char, handler: MgRequestHandler, data: *c_void);
-    fn mg_read(connection: *MgConnection, buf: *c_void, len: size_t) -> c_int;
-    fn mg_write(connection: *MgConnection, data: *c_void, len: size_t) -> c_int;
-    fn mg_get_header(connection: *MgConnection, name: *c_char) -> *c_char;
-    fn mg_get_request_info(connection: *MgConnection) -> *MgRequestInfo;
-}
+use civet;
+use civet::raw::{MgContext,MgConnection,MgHeader,MgRequestInfo};
+use civet::raw::{mg_set_request_handler,mg_read,mg_write,mg_get_header,mg_get_request_info};
 
-enum MgContext {}
-enum MgConnection {}
-
-type MgRequestHandler = fn(*MgConnection, *c_void) -> int;
-
-#[allow(dead_code)]
-struct MgHeader {
-    name: *c_char,
-    value: *c_char
-}
-
-#[allow(dead_code)]
-struct MgRequestInfo {
-    request_method: *c_char,
-    uri: *c_char,
-    http_version: *c_char,
-    query_string: *c_char,
-    remote_user: *c_char,
-    remote_ip: c_long,
-    remote_port: c_int,
-    is_ssl: bool,
-    user_data: *c_void,
-    conn_data: *c_void,
-
-    num_headers: c_int,
-    headers: [MgHeader, ..64]
-}
-
-#[allow(dead_code)]
-struct MgCallbacks {
-    begin_request: *c_void,
-    end_request: *c_void,
-    log_message: *c_void,
-    init_ssl: *c_void,
-    websocket_connect: *c_void,
-    websocket_ready: *c_void,
-    websocket_data: *c_void,
-    connection_close: *c_void,
-    open_file: *c_void,
-    init_lua: *c_void,
-    upload: *c_void,
-    http_error: *c_void
-}
-
-impl MgCallbacks {
-    pub fn new() -> MgCallbacks {
-        MgCallbacks {
-            begin_request: null(),
-            end_request: null(),
-            log_message: null(),
-            init_ssl: null(),
-            websocket_connect: null(),
-            websocket_ready: null(),
-            websocket_data: null(),
-            connection_close: null(),
-            open_file: null(),
-            init_lua: null(),
-            upload: null(),
-            http_error: null()
-        }
-    }
-}
+mod raw;
 
 pub struct Config {
     pub port: uint,
@@ -183,7 +116,7 @@ impl<'a> Writer for Response<'a> {
 
 impl<'a> Reader for Request<'a> {
     fn read(&mut self, buf: &mut[u8]) -> IoResult<uint> {
-        let ret = unsafe { mg_read(self.conn, buf.as_ptr() as *c_void, buf.len() as u64) };
+        let ret = civet::raw::read(self.conn, buf);
 
         if ret == 0 {
             Err(io::standard_error(io::EndOfFile))
@@ -272,7 +205,7 @@ impl Server {
         let mut server = None;
 
         options.with_c_strs(true, |options: **c_char| {
-            let context = unsafe { mg_start(&MgCallbacks::new(), transmute(handler), options) };
+            let context = unsafe { civet::raw::start(transmute(handler), options) };
             server = Some(Server { context: context });
 
             unsafe { mg_set_request_handler(context, "**".to_c_str().unwrap(), internal_handler, transmute(handler)) };
