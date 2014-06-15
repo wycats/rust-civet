@@ -1,21 +1,30 @@
+#![crate_id="civet"]
+#![crate_type="rlib"]
+
+extern crate libc;
+extern crate debug;
+extern crate native;
+extern crate collections;
+
 use std::io;
-use std::io::IoResult;
+use std::io::{IoResult,util};
+use std::collections::HashMap;
 
-use civet;
-use civet::raw::{RequestInfo,Header};
-use civet::raw::{get_header,get_headers,get_request_info};
+use raw::{RequestInfo,Header};
+use raw::{get_header,get_headers,get_request_info};
+use status::{ToStatusCode};
 
-pub use civet::raw::Config;
+pub use raw::Config;
 
 mod raw;
+pub mod status;
 
 pub struct Connection<'a> {
-    request: Request<'a>,
-    response: Response<'a>
+    request: Request<'a>
 }
 
 pub struct Request<'a> {
-    conn: &'a civet::raw::Connection,
+    conn: &'a raw::Connection,
     request_info: RequestInfo<'a>
 }
 
@@ -65,19 +74,25 @@ impl<'a> Request<'a> {
     }
 }
 
-pub struct Response<'a> {
-    conn: &'a civet::raw::Connection
+pub struct Response<S, R> {
+    status: S,
+    headers: HashMap<String, String>,
+    body: R
+}
+
+impl<S: ToStatusCode, R: Reader + Send> Response<S, R> {
+    pub fn new(status: S, headers: HashMap<String, String>, body: R) -> Response<S, R> {
+        Response { status: status, headers: headers, body: body }
+    }
 }
 
 impl<'a> Connection<'a> {
-    pub fn new<'a>(conn: &'a civet::raw::Connection) -> Result<Connection<'a>, String> {
+    fn new<'a>(conn: &'a raw::Connection) -> Result<Connection<'a>, String> {
         match request_info(conn) {
             Ok(info) => {
                 let request = Request { conn: conn, request_info: info };
-                let response = Response { conn: conn };
                 Ok(Connection {
-                    request: request,
-                    response: response
+                    request: request
                 })
             },
             Err(err) => Err(err)
@@ -86,9 +101,9 @@ impl<'a> Connection<'a> {
 
 }
 
-impl<'a> Writer for Response<'a> {
+impl<'a> Writer for Connection<'a> {
     fn write(&mut self, buf: &[u8]) -> IoResult<()> {
-        write_bytes(self.conn, buf).map_err(|_| {
+        write_bytes(self.request.conn, buf).map_err(|_| {
             io::standard_error(io::IoUnavailable)
         })
     }
@@ -96,7 +111,7 @@ impl<'a> Writer for Response<'a> {
 
 impl<'a> Reader for Request<'a> {
     fn read(&mut self, buf: &mut[u8]) -> IoResult<uint> {
-        let ret = civet::raw::read(self.conn, buf);
+        let ret = raw::read(self.conn, buf);
 
         if ret == 0 {
             Err(io::standard_error(io::EndOfFile))
@@ -107,7 +122,7 @@ impl<'a> Reader for Request<'a> {
 }
 
 pub struct Headers<'a> {
-    conn: &'a civet::raw::Connection
+    conn: &'a raw::Connection
 }
 
 impl<'a> Headers<'a> {
@@ -126,7 +141,7 @@ pub struct HeaderIterator<'a> {
 }
 
 impl<'a> HeaderIterator<'a> {
-    fn new<'a>(conn: &'a civet::raw::Connection) -> HeaderIterator<'a> {
+    fn new<'a>(conn: &'a raw::Connection) -> HeaderIterator<'a> {
         HeaderIterator { headers: get_headers(conn), position: 0 }
     }
 }
@@ -146,25 +161,48 @@ impl<'a> Iterator<(String, String)> for HeaderIterator<'a> {
     }
 }
 
-type ServerHandler = fn(&mut Request, &mut Response) -> IoResult<()>;
+pub type ServerHandler<S, R> = fn(&mut Request) -> IoResult<Response<S, R>>;
 
 #[allow(dead_code)]
-pub struct Server(civet::raw::Server);
+pub struct Server(raw::Server);
 
 impl Server {
-    pub fn start(options: Config, handler: ServerHandler) -> IoResult<Server> {
-        fn internal_handler(conn: &mut civet::raw::Connection, callback: &ServerHandler) -> Result<(), ()> {
+    pub fn start<S: ToStatusCode, R: Reader + Send>(options: Config, handler: ServerHandler<S, R>) -> IoResult<Server> {
+        fn internal_handler<S: ToStatusCode, R: Reader + Send>(conn: &mut raw::Connection, callback: &ServerHandler<S, R>) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
-            (*callback)(&mut connection.request, &mut connection.response).map_err(|_| ())
+            let response = (*callback)(&mut connection.request);
+            let writer = &mut connection;
+
+            fn err<W: Writer>(writer: &mut W) {
+                let _ = writeln!(writer, "HTTP/1.1 500 Internal Server Error");
+            }
+
+            match response {
+                Ok(Response { status, headers, mut body }) => {
+                    let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
+                    try!(writeln!(writer, "HTTP/1.1 {} {}", code, string).map_err(|_| ()));
+
+                    for (key, value) in headers.iter() {
+                        try!(writeln!(writer, "{}: {}", key, value).map_err(|_| ()));
+                    }
+
+                    try!(writeln!(writer, "").map_err(|_| ()));
+                    try!(util::copy(&mut body, writer).map_err(|_| ()));
+                },
+
+                Err(_) => return Err(err(writer))
+            }
+
+            Ok(())
         }
 
-        let raw_callback = civet::raw::ServerCallback::new(internal_handler, handler);
-        Ok(Server(civet::raw::Server::start(options, raw_callback)))
+        let raw_callback = raw::ServerCallback::new(internal_handler, handler);
+        Ok(Server(raw::Server::start(options, raw_callback)))
     }
 }
 
-fn write_bytes(connection: &civet::raw::Connection, bytes: &[u8]) -> Result<(), String> {
-    let ret = civet::raw::write(connection, bytes);
+fn write_bytes(connection: &raw::Connection, bytes: &[u8]) -> Result<(), String> {
+    let ret = raw::write(connection, bytes);
 
     if ret == -1 {
         return Err("Couldn't write bytes to the connection".to_str())
@@ -173,7 +211,7 @@ fn write_bytes(connection: &civet::raw::Connection, bytes: &[u8]) -> Result<(), 
     Ok(())
 }
 
-fn request_info<'a>(connection: &'a civet::raw::Connection) -> Result<RequestInfo<'a>, String> {
+fn request_info<'a>(connection: &'a raw::Connection) -> Result<RequestInfo<'a>, String> {
     match get_request_info(connection) {
         Some(info) => Ok(info),
         None => Err("Couldn't get request info for connection".to_str())

@@ -1,11 +1,10 @@
 #![feature(macro_rules)]
 
-extern crate libc;
-extern crate debug;
-extern crate native;
-extern crate collections;
+extern crate civet;
 
-use std::io::IoResult;
+use std::io::{IoResult,MemReader,MemWriter};
+use std::collections::HashMap;
+
 use civet::{Config,Server,Request,Response};
 
 macro_rules! http_write(
@@ -13,8 +12,6 @@ macro_rules! http_write(
         try!(write!($dst, concat!($fmt, "\r\n") $($arg)*))
     )
 )
-
-mod civet;
 
 fn main() {
     let _a = Server::start(Config { port: 8888, threads: 10 }, handler);
@@ -24,10 +21,10 @@ fn main() {
     }
 }
 
-fn handler(req: &mut Request, res: &mut Response) -> IoResult<()> {
-    http_write!(res, "HTTP/1.1 200 OK");
-    http_write!(res, "Content-Type: text/html");
-    http_write!(res, "");
+fn handler(req: &mut Request) -> IoResult<Response<int, MemReader>> {
+    let mut res = MemWriter::with_capacity(1000);
+
+    http_write!(res, "<style>body \\{ font-family: sans-serif; \\}</style>");
     http_write!(res, "<p>Method: {}</p>", req.method());
     http_write!(res, "<p>URL: {}</p>", req.url());
     http_write!(res, "<p>HTTP: {}</p>", req.http_version());
@@ -48,5 +45,10 @@ fn handler(req: &mut Request, res: &mut Response) -> IoResult<()> {
 
     http_write!(res, "</ul>");
 
-    Ok(())
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type".to_str(), "text/html".to_str());
+
+    let body = MemReader::new(res.unwrap());
+
+    Ok(Response::new(200, headers, body))
 }
