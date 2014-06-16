@@ -3,6 +3,7 @@ use std;
 use std::c_str::CString;
 use std::ptr::null;
 use std::mem::transmute;
+use std::kinds::marker::ContravariantLifetime;
 use native;
 
 pub struct Config {
@@ -47,7 +48,7 @@ impl Server {
         match *self { Server(context) => unsafe { &*context } }
     }
 
-    pub fn start<T>(options: Config, callback: ServerCallback<T>) -> Server {
+    pub fn start<T: 'static>(options: Config, callback: ServerCallback<T>) -> Server {
         let Config { port, threads } = options;
         let options = ["listening_ports".to_str(), port.to_str(), "num_threads".to_str(), threads.to_str()];
 
@@ -71,9 +72,12 @@ impl Drop for Server {
     }
 }
 
-fn raw_handler<T>(conn: *mut MgConnection, param: *c_void) -> int {
+fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *c_void) -> int {
+    use std::rt::task::Task;
+    use std::rt::local::Local;
+
     let (tx, rx) = channel();
-    let callback: Box<ServerCallback<T>> = unsafe { transmute(param) };
+    let callback: &ServerCallback<T> = unsafe { transmute(param) };
 
     let mut task = native::task::new((0, std::uint::MAX));
     task.death.on_exit = Some(proc(r) tx.send(r));
@@ -82,7 +86,7 @@ fn raw_handler<T>(conn: *mut MgConnection, param: *c_void) -> int {
 
     task.run(|| {
         let mut connection = Connection(conn);
-        result = Some((callback.callback)(&mut connection, &callback.param))
+        result = Some((callback.callback)(&mut connection, &callback.param));
     });
     let _ = rx.recv();
 
@@ -111,19 +115,19 @@ struct MgHeader {
     value: *c_char
 }
 
-pub struct Header<'a>(*MgHeader);
+pub struct Header<'a>(*MgHeader, ContravariantLifetime<'a>);
 
 impl<'a> Header<'a> {
-    fn as_ref<'a>(&'a self) -> &'a MgHeader {
-        match *self { Header(header) => unsafe { &*header } }
+    fn as_ref(&self) -> &'a MgHeader {
+        match *self { Header(header, _) => unsafe { &*header } }
     }
 
-    pub fn name(&self) -> Option<String> {
-        to_str(self.as_ref().name)
+    pub fn name(&self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |header| header.name)
     }
 
-    pub fn value(&self) -> Option<String> {
-        to_str(self.as_ref().value)
+    pub fn value(&self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |header| header.value)
     }
 }
 
@@ -157,24 +161,24 @@ impl<'a> RequestInfo<'a> {
         self.as_ref().num_headers as int
     }
 
-    pub fn method(&self) -> Option<String> {
-        to_str(self.as_ref().request_method)
+    pub fn method<'a>(&'a self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |info| info.request_method)
     }
 
-    pub fn url(&self) -> Option<String> {
-        to_str(self.as_ref().uri)
+    pub fn url<'a>(&'a self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |info| info.uri)
     }
 
-    pub fn http_version(&self) -> Option<String> {
-        to_str(self.as_ref().http_version)
+    pub fn http_version<'a>(&'a self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |info| info.http_version)
     }
 
-    pub fn query_string(&self) -> Option<String> {
-        to_str(self.as_ref().query_string)
+    pub fn query_string<'a>(&'a self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |info| info.query_string)
     }
 
-    pub fn remote_user(&self) -> Option<String> {
-        to_str(self.as_ref().remote_user)
+    pub fn remote_user<'a>(&'a self) -> Option<&'a str> {
+        to_slice(self.as_ref(), |info| info.remote_user)
     }
 
     pub fn remote_ip(&self) -> int {
@@ -226,21 +230,27 @@ impl MgCallbacks {
 }
 
 fn to_str(string: *c_char) -> Option<String> {
-    unsafe {
-        match string.to_option() {
-            None => None,
-            Some(c) => {
-                if *string == 0 {
-                    return None;
-                }
-
-                match CString::new(c, false).as_str() {
-                    Some(s) => Some(s.to_str()),
-                    None => None
-                }
-            }
-        }
+    if unsafe { string.is_null() || *string == 0 } {
+        return None;
     }
+
+    match unsafe { CString::new(string, false) }.as_str() {
+        Some(s) => Some(s.to_str()),
+        None => None
+    }
+}
+
+fn to_slice<'a, T>(obj: &'a T, callback: |&'a T| -> *c_char) -> Option<&'a str> {
+    let chars = callback(obj);
+
+    if unsafe { chars.is_null() || *chars == 0 } {
+        return None;
+    }
+
+    let c_string = unsafe { CString::new(chars, false) };
+    let len = c_string.len();
+
+    unsafe { Some(transmute(std::raw::Slice { data: chars, len: len })) }
 }
 
 pub fn start(options: **c_char) -> *MgContext {
@@ -268,7 +278,7 @@ pub fn get_request_info<'a>(conn: &'a Connection) -> Option<RequestInfo<'a>> {
 
 pub fn get_headers<'a>(conn: &'a Connection) -> Vec<Header<'a>> {
     match get_request_info(conn) {
-        Some(info) => info.as_ref().headers.iter().map(|h| Header(h)).collect(),
+        Some(info) => info.as_ref().headers.iter().map(|h| Header(h, ContravariantLifetime)).collect(),
         None => vec!()
     }
 }

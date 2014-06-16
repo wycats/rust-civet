@@ -37,23 +37,23 @@ impl<'a> Request<'a> {
         self.request_info.num_headers() as uint
     }
 
-    pub fn method(&self) -> Option<String> {
+    pub fn method<'a>(&'a self) -> Option<&'a str> {
         self.request_info.method()
     }
 
-    pub fn url(&self) -> Option<String> {
+    pub fn url<'a>(&'a self) -> Option<&'a str> {
         self.request_info.url()
     }
 
-    pub fn http_version(&self) -> Option<String> {
+    pub fn http_version<'a>(&'a self) -> Option<&'a str> {
         self.request_info.http_version()
     }
 
-    pub fn query_string(&self) -> Option<String> {
+    pub fn query_string<'a>(&'a self) -> Option<&'a str> {
         self.request_info.query_string()
     }
 
-    pub fn remote_user(&self) -> Option<String> {
+    pub fn remote_user<'a>(&'a self) -> Option<&'a str> {
         self.request_info.remote_user()
     }
 
@@ -141,17 +141,17 @@ pub struct HeaderIterator<'a> {
 }
 
 impl<'a> HeaderIterator<'a> {
-    fn new<'a>(conn: &'a raw::Connection) -> HeaderIterator<'a> {
+    fn new<'b>(conn: &'b raw::Connection) -> HeaderIterator<'b> {
         HeaderIterator { headers: get_headers(conn), position: 0 }
     }
 }
 
-impl<'a> Iterator<(String, String)> for HeaderIterator<'a> {
-    fn next(&mut self) -> Option<(String, String)> {
+impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
+    fn next(&mut self) -> Option<(&'a str, &'a str)> {
         let pos = self.position;
         let headers = &self.headers;
 
-        if headers.len() <= pos {
+        if self.headers.len() <= pos {
             None
         } else {
             let header = headers.get(pos);
