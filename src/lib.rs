@@ -28,7 +28,39 @@ pub struct Request<'a> {
     request_info: RequestInfo<'a>
 }
 
+pub struct CopiedRequest {
+    pub headers: HashMap<String, String>,
+    pub method: String,
+    pub url: String,
+    pub http_version: String,
+    pub query_string: String,
+    pub remote_user: String,
+    pub remote_ip: int,
+    pub remote_port: int,
+    pub is_ssl: bool
+}
+
 impl<'a> Request<'a> {
+    pub fn copy(&self) -> CopiedRequest {
+        let mut headers = HashMap::new();
+
+        for (key, value) in self.headers().iter() {
+            headers.insert(key.to_str(), value.to_str());
+        }
+
+        CopiedRequest {
+            headers: headers,
+            method: self.method().to_str(),
+            url: self.url().to_str(),
+            http_version: self.http_version().to_str(),
+            query_string: self.query_string().to_str(),
+            remote_user: self.remote_user().to_str(),
+            remote_ip: self.remote_ip(),
+            remote_port: self.remote_port(),
+            is_ssl: self.is_ssl()
+        }
+    }
+
     pub fn get_header<S: Str>(&mut self, string: S) -> Option<String> {
         get_header(self.conn, string.as_slice())
     }
@@ -180,13 +212,13 @@ impl Server {
             match response {
                 Ok(Response { status, headers, mut body }) => {
                     let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
-                    try!(writeln!(writer, "HTTP/1.1 {} {}", code, string).map_err(|_| ()));
+                    try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
 
                     for (key, value) in headers.iter() {
-                        try!(writeln!(writer, "{}: {}", key, value).map_err(|_| ()));
+                        try!(write!(writer, "{}: {}\r\n", key, value).map_err(|_| ()));
                     }
 
-                    try!(writeln!(writer, "").map_err(|_| ()));
+                    try!(write!(writer, "\r\n").map_err(|_| ()));
                     try!(util::copy(&mut body, writer).map_err(|_| ()));
                 },
 
