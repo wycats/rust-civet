@@ -3,7 +3,6 @@ use std;
 use std::c_str::CString;
 use std::ptr::null;
 use std::mem::transmute;
-use std::kinds::marker::ContravariantLifetime;
 use native;
 
 pub struct Config {
@@ -73,9 +72,6 @@ impl Drop for Server {
 }
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *c_void) -> int {
-    use std::rt::task::Task;
-    use std::rt::local::Local;
-
     let (tx, rx) = channel();
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
 
@@ -88,6 +84,7 @@ fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *c_void) -> int {
         let mut connection = Connection(conn);
         result = Some((callback.callback)(&mut connection, &callback.param));
     });
+
     let _ = rx.recv();
 
     match result {
@@ -115,11 +112,11 @@ struct MgHeader {
     value: *c_char
 }
 
-pub struct Header<'a>(*MgHeader, ContravariantLifetime<'a>);
+pub struct Header<'a>(*MgHeader);
 
 impl<'a> Header<'a> {
     fn as_ref(&self) -> &'a MgHeader {
-        match *self { Header(header, _) => unsafe { &*header } }
+        match *self { Header(header) => unsafe { &*header } }
     }
 
     pub fn name(&self) -> Option<&'a str> {
@@ -229,17 +226,6 @@ impl MgCallbacks {
     }
 }
 
-fn to_str(string: *c_char) -> Option<String> {
-    if unsafe { string.is_null() || *string == 0 } {
-        return None;
-    }
-
-    match unsafe { CString::new(string, false) }.as_str() {
-        Some(s) => Some(s.to_str()),
-        None => None
-    }
-}
-
 fn to_slice<'a, T>(obj: &'a T, callback: |&'a T| -> *c_char) -> Option<&'a str> {
     let chars = callback(obj);
 
@@ -278,7 +264,7 @@ pub fn get_request_info<'a>(conn: &'a Connection) -> Option<RequestInfo<'a>> {
 
 pub fn get_headers<'a>(conn: &'a Connection) -> Vec<Header<'a>> {
     match get_request_info(conn) {
-        Some(info) => info.as_ref().headers.iter().map(|h| Header(h, ContravariantLifetime)).collect(),
+        Some(info) => info.as_ref().headers.iter().map(|h| Header(h)).collect(),
         None => vec!()
     }
 }
