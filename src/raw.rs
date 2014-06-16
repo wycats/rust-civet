@@ -226,7 +226,7 @@ impl MgCallbacks {
     }
 }
 
-fn to_slice<'a, T>(obj: &'a T, callback: |&'a T| -> *c_char) -> Option<&'a str> {
+fn to_slice<'a, T>(obj: &'a T, callback: |&'a T|:'static -> *c_char) -> Option<&'a str> {
     let chars = callback(obj);
 
     if unsafe { chars.is_null() || *chars == 0 } {
