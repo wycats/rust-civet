@@ -14,9 +14,9 @@ install:
      lib/rustlib/manifest.in)
   - sudo ./rust-nightly-x86_64-unknown-linux-gnu/install.sh
 script:
-  - make
-  - make examples
+  - make CC="$CC" RUSTC="$RUSTC"
+  - make CC="$CC" RUSTC="$RUSTC" examples
 
 env:
   - ARCH=i686 CC='cc -m32' RUSTC='rustc --target=i686-unknown-linux-gnu'
-  - ARCH=x86_64
+  - ARCH=x86_64 CC=cc RUSTC='rustc --target=x86_64-unknown-linux-gnu'
