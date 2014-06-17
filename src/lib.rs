@@ -7,6 +7,7 @@ extern crate native;
 extern crate collections;
 
 use std::io;
+use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult,util};
 use std::collections::HashMap;
 
@@ -35,8 +36,8 @@ pub struct CopiedRequest {
     pub http_version: String,
     pub query_string: String,
     pub remote_user: String,
-    pub remote_ip: int,
-    pub remote_port: int,
+    pub remote_ip: IpAddr,
+    pub remote_port: u16,
     pub is_ssl: bool
 }
 
@@ -89,12 +90,16 @@ impl<'a> Request<'a> {
         self.request_info.remote_user()
     }
 
-    pub fn remote_ip(&self) -> int {
-        self.request_info.remote_ip()
+    pub fn remote_ip(&self) -> IpAddr {
+        let ip = self.request_info.remote_ip();
+        Ipv4Addr((ip >> 24) as u8,
+                 (ip >> 16) as u8,
+                 (ip >>  8) as u8,
+                 (ip >>  0) as u8)
     }
 
-    pub fn remote_port(&self) -> int {
-        self.request_info.remote_port()
+    pub fn remote_port(&self) -> u16 {
+        self.request_info.remote_port() as u16
     }
 
     pub fn is_ssl(&self) -> bool {
