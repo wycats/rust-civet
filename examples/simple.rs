@@ -24,7 +24,7 @@ fn main() {
 fn handler(req: &mut Request) -> IoResult<Response<int, MemReader>> {
     let mut res = MemWriter::with_capacity(10000);
 
-    http_write!(res, "<style>body \\{ font-family: sans-serif; \\}</style>");
+    http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
     http_write!(res, "<p>Method: {}</p>", req.method());
     http_write!(res, "<p>URL: {}</p>", req.url());
     http_write!(res, "<p>HTTP: {}</p>", req.http_version());

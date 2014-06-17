@@ -31,7 +31,7 @@ fn handler(req: &mut Request) -> IoResult<Response<int, ChanReader>> {
     spawn(proc() {
         let mut res = ChanWriter::new(sender);
 
-        http_write!(res, "<style>body \\{ font-family: sans-serif; \\}</style>");
+        http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
         http_write!(res, "<p>Method: {}</p>", req.method);
         http_write!(res, "<p>URL: {}</p>", req.url);
         http_write!(res, "<p>HTTP: {}</p>", req.http_version);
