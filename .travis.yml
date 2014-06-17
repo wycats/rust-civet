@@ -1,4 +1,7 @@
 language: rust
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install gcc-multilib
 install:
   - curl -O http://static.rust-lang.org/dist/rust-nightly-x86_64-unknown-linux-gnu.tar.gz
   - curl -O http://static.rust-lang.org/dist/rust-nightly-i686-unknown-linux-gnu.tar.gz
@@ -10,7 +13,6 @@ install:
      find lib/rustlib/i686-unknown-linux-gnu/lib -type f >>
      lib/rustlib/manifest.in)
   - sudo ./rust-nightly-x86_64-unknown-linux-gnu/install.sh
-  - find /usr -name types.h
 script:
   - make
   - make examples
