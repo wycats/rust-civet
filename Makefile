@@ -19,7 +19,7 @@ EXAMPLES := $(EXAMPLES:%=$(BUILD)/%)
 # Build targets
 #
 
-all: $(LIB) examples
+all: $(LIB)
 
 examples: $(EXAMPLES)
 
@@ -42,4 +42,4 @@ $(BUILD):
 
 clean:
 	rm -rf $(BUILD)
-	$(MAKE) -C src/civetweb clean
+	$(MAKE) -C src/civetweb distclean
