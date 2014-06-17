@@ -74,20 +74,14 @@ impl Drop for Server {
 }
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *c_void) -> int {
-    let (tx, rx) = channel();
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
-
-    let mut task = native::task::new((0, std::uint::MAX));
-    task.death.on_exit = Some(proc(r) tx.send(r));
-
+    let task = native::task::new((0, std::uint::MAX));
     let mut result = None;
 
     task.run(|| {
         let mut connection = Connection(conn);
         result = Some((callback.callback)(&mut connection, &callback.param));
     });
-
-    let _ = rx.recv();
 
     match result {
         None => 0,
