@@ -16,7 +16,7 @@ impl Config {
     }
 }
 
-#[link(name="civetweb")]
+#[link(name = "civetweb", kind = "static")]
 extern {
     fn mg_start(callbacks: *MgCallbacks, user_data: *c_void, options: **c_char) -> *MgContext;
     fn mg_stop(context: *MgContext);
