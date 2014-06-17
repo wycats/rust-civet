@@ -1,8 +1,8 @@
 language: rust
 install:
-  - curl -O http://static.rust-lang.org/dist/rust-nightly-$ARCH-unknown-linux-gnu.tar.gz
-  - tar xfz rust-nightly-$ARCH-unknown-linux-gnu.tar.gz
-  - (cd rust-nightly-$ARCH-unknown-linux-gnu/ && sudo ./install.sh)
+  - curl -O http://static.rust-lang.org/dist/rust-nightly-${ARCH}-unknown-linux-gnu.tar.gz
+  - tar xfz rust-nightly-${ARCH}-unknown-linux-gnu.tar.gz
+  - (cd rust-nightly-${ARCH}-unknown-linux-gnu/ && sudo ./install.sh)
 script:
   - make
   - make examples
