@@ -244,12 +244,12 @@ pub fn start(options: **c_char) -> *MgContext {
 }
 
 pub fn read(conn: &Connection, buf: &mut [u8]) -> i32 {
-    unsafe { mg_read(conn.unwrap(), buf.as_ptr() as *c_void, buf.len() as u64) }
+    unsafe { mg_read(conn.unwrap(), buf.as_ptr() as *c_void, buf.len() as size_t) }
 }
 
 pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
     let c_bytes = bytes.as_ptr() as *c_void;
-    unsafe { mg_write(conn.unwrap(), c_bytes, bytes.len() as u64) }
+    unsafe { mg_write(conn.unwrap(), c_bytes, bytes.len() as size_t) }
 }
 
 pub fn get_header(conn: &Connection, string: &str) -> Option<String> {
