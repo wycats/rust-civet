@@ -31,11 +31,11 @@ pub struct Request<'a> {
 
 pub struct CopiedRequest {
     pub headers: HashMap<String, String>,
-    pub method: String,
-    pub url: String,
-    pub http_version: String,
-    pub query_string: String,
-    pub remote_user: String,
+    pub method: Option<String>,
+    pub url: Option<String>,
+    pub http_version: Option<String>,
+    pub query_string: Option<String>,
+    pub remote_user: Option<String>,
     pub remote_ip: IpAddr,
     pub remote_port: u16,
     pub is_ssl: bool
@@ -51,11 +51,11 @@ impl<'a> Request<'a> {
 
         CopiedRequest {
             headers: headers,
-            method: self.method().to_str(),
-            url: self.url().to_str(),
-            http_version: self.http_version().to_str(),
-            query_string: self.query_string().to_str(),
-            remote_user: self.remote_user().to_str(),
+            method: self.method().map(|a| a.to_str()),
+            url: self.url().map(|a| a.to_str()),
+            http_version: self.http_version().map(|a| a.to_str()),
+            query_string: self.query_string().map(|a| a.to_str()),
+            remote_user: self.remote_user().map(|a| a.to_str()),
             remote_ip: self.remote_ip(),
             remote_port: self.remote_port(),
             is_ssl: self.is_ssl()
