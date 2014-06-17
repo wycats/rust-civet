@@ -113,7 +113,9 @@ pub struct Response<S, R> {
 }
 
 impl<S: ToStatusCode, R: Reader + Send> Response<S, R> {
-    pub fn new(status: S, headers: HashMap<String, String>, body: R) -> Response<S, R> {
+    pub fn new(status: S,
+               headers: HashMap<String, String>,
+               body: R) -> Response<S, R> {
         Response { status: status, headers: headers, body: body }
     }
 }
@@ -199,8 +201,15 @@ pub type ServerHandler<S, R> = fn(&mut Request) -> IoResult<Response<S, R>>;
 pub struct Server(raw::Server);
 
 impl Server {
-    pub fn start<S: ToStatusCode, R: Reader + Send>(options: Config, handler: ServerHandler<S, R>) -> IoResult<Server> {
-        fn internal_handler<S: ToStatusCode, R: Reader + Send>(conn: &mut raw::Connection, callback: &ServerHandler<S, R>) -> Result<(), ()> {
+    pub fn start<S: ToStatusCode, R: Reader + Send>(options: Config,
+                                                    handler: ServerHandler<S, R>)
+        -> IoResult<Server>
+    {
+        fn internal_handler<S: ToStatusCode, R: Reader + Send>(
+            conn: &mut raw::Connection,
+            callback: &ServerHandler<S, R>)
+            -> Result<(), ()>
+        {
             let mut connection = Connection::new(conn).unwrap();
             let response = (*callback)(&mut connection.request);
             let writer = &mut connection;
@@ -209,21 +218,19 @@ impl Server {
                 let _ = writeln!(writer, "HTTP/1.1 500 Internal Server Error");
             }
 
-            match response {
-                Ok(Response { status, headers, mut body }) => {
-                    let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
-                    try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
+            let Response { status, headers, mut body } = match response {
+                Ok(r) => r,
+                Err(_) => return Err(err(writer)),
+            };
+            let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
+            try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
 
-                    for (key, value) in headers.iter() {
-                        try!(write!(writer, "{}: {}\r\n", key, value).map_err(|_| ()));
-                    }
-
-                    try!(write!(writer, "\r\n").map_err(|_| ()));
-                    try!(util::copy(&mut body, writer).map_err(|_| ()));
-                },
-
-                Err(_) => return Err(err(writer))
+            for (key, value) in headers.iter() {
+                try!(write!(writer, "{}: {}\r\n", key, value).map_err(|_| ()));
             }
+
+            try!(write!(writer, "\r\n").map_err(|_| ()));
+            try!(util::copy(&mut body, writer).map_err(|_| ()));
 
             Ok(())
         }
@@ -243,7 +250,9 @@ fn write_bytes(connection: &raw::Connection, bytes: &[u8]) -> Result<(), String>
     Ok(())
 }
 
-fn request_info<'a>(connection: &'a raw::Connection) -> Result<RequestInfo<'a>, String> {
+fn request_info<'a>(connection: &'a raw::Connection)
+    -> Result<RequestInfo<'a>, String>
+{
     match get_request_info(connection) {
         Some(info) => Ok(info),
         None => Err("Couldn't get request info for connection".to_str())

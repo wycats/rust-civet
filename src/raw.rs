@@ -49,19 +49,21 @@ impl Server {
 
     pub fn start<T: 'static>(options: Config, callback: ServerCallback<T>) -> Server {
         let Config { port, threads } = options;
-        let options = ["listening_ports".to_str(), port.to_str(), "num_threads".to_str(), threads.to_str()];
+        let options = vec!(
+            "listening_ports".to_c_str(), port.to_str().to_c_str(),
+            "num_threads".to_c_str(), threads.to_str().to_c_str(),
+        );
+        let mut ptrs: Vec<_> = options.iter().map(|a| a.with_ref(|p| p)).collect();
+        ptrs.push(0 as *_);
 
-        let mut server = None;
-        let mut cb = Some(box callback);
-
-        options.with_c_strs(true, |options| {
-            let context = start(options);
-            server = Some(Server(context));
-
-            unsafe { mg_set_request_handler(context, "**".to_c_str().unwrap(), raw_handler::<T>, transmute(cb.take_unwrap())) }
-        });
-
-        server.unwrap()
+        let context = start(ptrs.as_ptr());
+        let uri = "**".to_c_str();
+        unsafe {
+            mg_set_request_handler(context, uri.with_ref(|p| p),
+                                   raw_handler::<T>,
+                                   transmute(box callback));
+        }
+        Server(context)
     }
 }
 
@@ -266,20 +268,5 @@ pub fn get_headers<'a>(conn: &'a Connection) -> Vec<Header<'a>> {
     match get_request_info(conn) {
         Some(info) => info.as_ref().headers.iter().map(|h| Header(h)).collect(),
         None => vec!()
-    }
-}
-
-trait WithCStrs {
-    fn with_c_strs(&self, null_terminated: bool, f: |**c_char|) ;
-}
-
-impl<'a, T: ToCStr> WithCStrs for &'a [T] {
-    fn with_c_strs(&self, null_terminate: bool, f: |**c_char|) {
-        let c_strs: Vec<CString> = self.iter().map(|s: &T| s.to_c_str()).collect();
-        let mut ptrs: Vec<*c_char> = c_strs.iter().map(|c: &CString| c.with_ref(|ptr| ptr)).collect();
-        if null_terminate {
-            ptrs.push(null());
-        }
-        f(ptrs.as_ptr())
     }
 }
