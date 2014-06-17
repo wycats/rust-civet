@@ -36,8 +36,9 @@ pub struct ServerCallback<T> {
     param: T
 }
 
-impl<T> ServerCallback<T> {
-    pub fn new(callback: fn(&mut Connection, &T) -> Result<(), ()>, param: T) -> ServerCallback<T> {
+impl<T: Share> ServerCallback<T> {
+    pub fn new(callback: fn(&mut Connection, &T) -> Result<(), ()>,
+               param: T) -> ServerCallback<T> {
         ServerCallback { callback: callback, param: param }
     }
 }
@@ -47,7 +48,8 @@ impl Server {
         match *self { Server(context) => unsafe { &*context } }
     }
 
-    pub fn start<T: 'static>(options: Config, callback: ServerCallback<T>) -> Server {
+    pub fn start<T: 'static + Share>(options: Config,
+                                     callback: ServerCallback<T>) -> Server {
         let Config { port, threads } = options;
         let options = vec!(
             "listening_ports".to_c_str(), port.to_str().to_c_str(),
