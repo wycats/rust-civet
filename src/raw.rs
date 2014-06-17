@@ -18,11 +18,15 @@ impl Config {
 
 #[link(name = "civetweb", kind = "static")]
 extern {
-    fn mg_start(callbacks: *MgCallbacks, user_data: *c_void, options: **c_char) -> *MgContext;
+    fn mg_start(callbacks: *MgCallbacks, user_data: *c_void,
+                options: **c_char) -> *MgContext;
     fn mg_stop(context: *MgContext);
-    fn mg_set_request_handler(context: *MgContext, uri: *c_char, handler: MgRequestHandler, data: *c_void);
-    fn mg_read(connection: *mut MgConnection, buf: *c_void, len: size_t) -> c_int;
-    fn mg_write(connection: *mut MgConnection, data: *c_void, len: size_t) -> c_int;
+    fn mg_set_request_handler(context: *MgContext, uri: *c_char,
+                              handler: MgRequestHandler, data: *c_void);
+    fn mg_read(connection: *mut MgConnection, buf: *c_void,
+               len: size_t) -> c_int;
+    fn mg_write(connection: *mut MgConnection, data: *c_void,
+                len: size_t) -> c_int;
     fn mg_get_header(connection: *mut MgConnection, name: *c_char) -> *c_char;
     fn mg_get_request_info(connection: *mut MgConnection) -> *MgRequestInfo;
 }
@@ -104,7 +108,7 @@ impl Connection {
 
 type MgRequestHandler = fn(*mut MgConnection, *c_void) -> int;
 
-#[allow(dead_code)]
+#[repr(C)]
 struct MgHeader {
     name: *c_char,
     value: *c_char
@@ -126,6 +130,7 @@ impl<'a> Header<'a> {
     }
 }
 
+#[repr(C)]
 struct MgRequestInfo {
     request_method: *c_char,
     uri: *c_char,
@@ -134,11 +139,9 @@ struct MgRequestInfo {
     remote_user: *c_char,
     remote_ip: c_long,
     remote_port: c_int,
-    is_ssl: bool,
+    is_ssl: c_int,
 
-    #[allow(dead_code)]
     user_data: *c_void,
-    #[allow(dead_code)]
     conn_data: *c_void,
 
     num_headers: c_int,
@@ -185,11 +188,11 @@ impl<'a> RequestInfo<'a> {
     }
 
     pub fn is_ssl(&self) -> bool {
-        self.as_ref().is_ssl
+        self.as_ref().is_ssl != 0
     }
 }
 
-#[allow(dead_code)]
+#[repr(C)]
 struct MgCallbacks {
     begin_request: *c_void,
     end_request: *c_void,
