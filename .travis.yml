@@ -16,6 +16,7 @@ install:
 script:
   - make CC="$CC" RUSTC="$RUSTC"
   - make CC="$CC" RUSTC="$RUSTC" examples
+  - make CC="$CC" RUSTC="$RUSTC" check
 
 env:
   - ARCH=i686 CC='cc -m32' RUSTC='rustc --target=i686-unknown-linux-gnu'
