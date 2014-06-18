@@ -262,11 +262,15 @@ pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
 
 pub fn get_header(conn: &Connection, string: &str) -> Option<String> {
     let string = string.to_c_str();
-    let cstr = unsafe {
-        mg_get_header(conn.unwrap(), string.with_ref(|p| p)).to_option()
+    let header = unsafe {
+        mg_get_header(conn.unwrap(), string.with_ref(|p| p))
     };
-
-    cstr.map(|c| unsafe { CString::new(c, false) }.as_str().to_str())
+    if header.is_null() {
+        None
+    } else {
+        let header = unsafe { CString::new(header, false) };
+        header.as_str().map(|s| s.to_str())
+    }
 }
 
 pub fn get_request_info<'a>(conn: &'a Connection) -> Option<RequestInfo<'a>> {

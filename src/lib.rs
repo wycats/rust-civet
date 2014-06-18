@@ -277,11 +277,22 @@ fn request_info<'a>(connection: &'a raw::Connection)
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+    use std::io::net::ip::SocketAddr;
+    use std::io::net::tcp::TcpStream;
     use std::io::test::next_test_ip4;
+    use std::io::{IoResult, MemReader};
+    use std::sync::Mutex;
     use super::{Server, Config, Request, Response, Handler};
-    use std::io::IoResult;
 
     fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
+
+    fn request(addr: SocketAddr, req: &str) -> String {
+        let mut s = TcpStream::connect(addr.ip.to_str().as_slice(),
+                                       addr.port).unwrap();
+        s.write_str(req.trim_left()).unwrap();
+        s.read_to_str().unwrap()
+    }
 
     #[test]
     fn smoke() {
@@ -314,5 +325,50 @@ mod test {
         let addr = next_test_ip4();
         drop(Server::start(Config { port: addr.port, threads: 1 }, Foo));
         unsafe { assert!(DROPPED); }
+    }
+
+    #[test]
+    fn invokes() {
+        struct Foo(Mutex<Sender<()>>);
+        impl Handler for Foo {
+            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+                let Foo(ref tx) = *self;
+                tx.lock().send(());
+                Ok(Response::new(200, HashMap::new(), MemReader::new(vec![])))
+            }
+        }
+
+        let addr = next_test_ip4();
+        let (tx, rx) = channel();
+        let handler = Foo(Mutex::new(tx));
+        let _s = Server::start(Config { port: addr.port, threads: 1 }, handler);
+        request(addr, r"
+GET / HTTP/1.1
+
+");
+        rx.recv();
+    }
+
+    #[test]
+    fn header_sent() {
+        struct Foo(Mutex<Sender<String>>);
+        impl Handler for Foo {
+            fn call(&self, req: &mut Request) -> IoResult<Response> {
+                let Foo(ref tx) = *self;
+                tx.lock().send(req.get_header("Foo").unwrap());
+                Ok(Response::new(200, HashMap::new(), MemReader::new(vec![])))
+            }
+        }
+
+        let addr = next_test_ip4();
+        let (tx, rx) = channel();
+        let handler = Foo(Mutex::new(tx));
+        let _s = Server::start(Config { port: addr.port, threads: 1 }, handler);
+        request(addr, r"
+GET / HTTP/1.1
+Foo: bar
+
+");
+        assert_eq!(rx.recv().as_slice(), "bar");
     }
 }
