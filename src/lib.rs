@@ -206,19 +206,27 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
     }
 }
 
-pub type ServerHandler = fn(&mut Request) -> IoResult<Response>;
+pub trait Handler {
+    fn call(&self, req: &mut Request) -> IoResult<Response>;
+}
 
-#[allow(dead_code)]
-pub struct Server(raw::Server<ServerHandler>);
+impl Handler for fn(&mut Request) -> IoResult<Response> {
+    fn call(&self, req: &mut Request) -> IoResult<Response> {
+        (*self)(req)
+    }
+}
+
+// TODO: Why is 'static needed here and below?
+pub struct Server(raw::Server<Box<Handler + 'static + Share>>);
 
 impl Server {
-    pub fn start(options: Config, handler: ServerHandler)
+    pub fn start<H: 'static + Handler + Share>(options: Config, handler: H)
         -> IoResult<Server>
     {
         fn internal_handler(conn: &mut raw::Connection,
-                            callback: &ServerHandler) -> Result<(), ()> {
+                            handler: &Box<Handler>) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
-            let response = (*callback)(&mut connection.request);
+            let response = handler.call(&mut connection.request);
             let writer = &mut connection;
 
             fn err<W: Writer>(writer: &mut W) {
@@ -242,8 +250,9 @@ impl Server {
             Ok(())
         }
 
-        let raw_callback = raw::ServerCallback::new(internal_handler, handler);
-        Ok(Server(raw::Server::start(options, raw_callback)))
+        let raw_callback = raw::ServerCallback::new(internal_handler,
+                                                    box handler);
+        Ok(Server(try!(raw::Server::start(options, raw_callback))))
     }
 }
 
@@ -266,3 +275,100 @@ fn request_info<'a>(connection: &'a raw::Connection)
     }
 }
 
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+    use std::io::net::ip::SocketAddr;
+    use std::io::net::tcp::TcpStream;
+    use std::io::test::next_test_ip4;
+    use std::io::{IoResult, MemReader};
+    use std::sync::Mutex;
+    use super::{Server, Config, Request, Response, Handler};
+
+    fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
+
+    fn request(addr: SocketAddr, req: &str) -> String {
+        let mut s = TcpStream::connect(addr.ip.to_str().as_slice(),
+                                       addr.port).unwrap();
+        s.write_str(req.trim_left()).unwrap();
+        s.read_to_str().unwrap()
+    }
+
+    #[test]
+    fn smoke() {
+        let addr = next_test_ip4();
+        Server::start(Config { port: addr.port, threads: 1 }, noop).unwrap();
+    }
+
+    #[test]
+    fn dupe_port() {
+        let addr = next_test_ip4();
+        let s1 = Server::start(Config { port: addr.port, threads: 1 }, noop);
+        assert!(s1.is_ok());
+        let s2 = Server::start(Config { port: addr.port, threads: 1 }, noop);
+        assert!(s2.is_err());
+    }
+
+    #[test]
+    fn drops_handler() {
+        static mut DROPPED: bool = false;
+        struct Foo;
+        impl Handler for Foo {
+            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+                fail!()
+            }
+        }
+        impl Drop for Foo {
+            fn drop(&mut self) { unsafe { DROPPED = true; } }
+        }
+
+        let addr = next_test_ip4();
+        drop(Server::start(Config { port: addr.port, threads: 1 }, Foo));
+        unsafe { assert!(DROPPED); }
+    }
+
+    #[test]
+    fn invokes() {
+        struct Foo(Mutex<Sender<()>>);
+        impl Handler for Foo {
+            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+                let Foo(ref tx) = *self;
+                tx.lock().send(());
+                Ok(Response::new(200, HashMap::new(), MemReader::new(vec![])))
+            }
+        }
+
+        let addr = next_test_ip4();
+        let (tx, rx) = channel();
+        let handler = Foo(Mutex::new(tx));
+        let _s = Server::start(Config { port: addr.port, threads: 1 }, handler);
+        request(addr, r"
+GET / HTTP/1.1
+
+");
+        rx.recv();
+    }
+
+    #[test]
+    fn header_sent() {
+        struct Foo(Mutex<Sender<String>>);
+        impl Handler for Foo {
+            fn call(&self, req: &mut Request) -> IoResult<Response> {
+                let Foo(ref tx) = *self;
+                tx.lock().send(req.get_header("Foo").unwrap());
+                Ok(Response::new(200, HashMap::new(), MemReader::new(vec![])))
+            }
+        }
+
+        let addr = next_test_ip4();
+        let (tx, rx) = channel();
+        let handler = Foo(Mutex::new(tx));
+        let _s = Server::start(Config { port: addr.port, threads: 1 }, handler);
+        request(addr, r"
+GET / HTTP/1.1
+Foo: bar
+
+");
+        assert_eq!(rx.recv().as_slice(), "bar");
+    }
+}
