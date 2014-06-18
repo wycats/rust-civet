@@ -371,4 +371,22 @@ Foo: bar
 ");
         assert_eq!(rx.recv().as_slice(), "bar");
     }
+
+    #[test]
+    fn failing_handler() {
+        struct Foo;
+        impl Handler for Foo {
+            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+                fail!()
+            }
+        }
+
+        let addr = next_test_ip4();
+        let _s = Server::start(Config { port: addr.port, threads: 1 }, Foo);
+        request(addr, r"
+GET / HTTP/1.1
+Foo: bar
+
+");
+    }
 }
