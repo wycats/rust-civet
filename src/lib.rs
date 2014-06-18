@@ -111,20 +111,22 @@ impl<'a> Request<'a> {
     }
 }
 
-pub struct Response<R> {
+pub struct Response {
     status: status::StatusCode,
     headers: HashMap<String, String>,
-    body: R
+    body: Box<Reader + Send>,
 }
 
-impl<R: Reader + Send> Response<R> {
-    pub fn new<S: ToStatusCode>(status: S,
-                                headers: HashMap<String, String>,
-                                body: R) -> Response<R> {
+impl Response {
+    pub fn new<S: ToStatusCode, R: Reader + Send>(
+        status: S,
+        headers: HashMap<String, String>,
+        body: R) -> Response
+    {
         Response {
             status: status.to_status().unwrap(),
             headers: headers,
-            body: body,
+            body: box body,
         }
     }
 }
@@ -204,20 +206,17 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
     }
 }
 
-pub type ServerHandler<R> = fn(&mut Request) -> IoResult<Response<R>>;
+pub type ServerHandler = fn(&mut Request) -> IoResult<Response>;
 
 #[allow(dead_code)]
 pub struct Server(raw::Server);
 
 impl Server {
-    pub fn start<R: Reader + Send>(options: Config, handler: ServerHandler<R>)
+    pub fn start(options: Config, handler: ServerHandler)
         -> IoResult<Server>
     {
-        fn internal_handler<R: Reader + Send>(
-            conn: &mut raw::Connection,
-            callback: &ServerHandler<R>)
-            -> Result<(), ()>
-        {
+        fn internal_handler(conn: &mut raw::Connection,
+                            callback: &ServerHandler) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             let response = (*callback)(&mut connection.request);
             let writer = &mut connection;
