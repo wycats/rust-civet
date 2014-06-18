@@ -7,6 +7,7 @@ extern crate native;
 extern crate collections;
 
 use std::io;
+use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult,util};
 use std::collections::HashMap;
 
@@ -30,13 +31,13 @@ pub struct Request<'a> {
 
 pub struct CopiedRequest {
     pub headers: HashMap<String, String>,
-    pub method: String,
-    pub url: String,
-    pub http_version: String,
-    pub query_string: String,
-    pub remote_user: String,
-    pub remote_ip: int,
-    pub remote_port: int,
+    pub method: Option<String>,
+    pub url: Option<String>,
+    pub http_version: Option<String>,
+    pub query_string: Option<String>,
+    pub remote_user: Option<String>,
+    pub remote_ip: IpAddr,
+    pub remote_port: u16,
     pub is_ssl: bool
 }
 
@@ -50,11 +51,11 @@ impl<'a> Request<'a> {
 
         CopiedRequest {
             headers: headers,
-            method: self.method().to_str(),
-            url: self.url().to_str(),
-            http_version: self.http_version().to_str(),
-            query_string: self.query_string().to_str(),
-            remote_user: self.remote_user().to_str(),
+            method: self.method().map(|a| a.to_str()),
+            url: self.url().map(|a| a.to_str()),
+            http_version: self.http_version().map(|a| a.to_str()),
+            query_string: self.query_string().map(|a| a.to_str()),
+            remote_user: self.remote_user().map(|a| a.to_str()),
             remote_ip: self.remote_ip(),
             remote_port: self.remote_port(),
             is_ssl: self.is_ssl()
@@ -89,12 +90,16 @@ impl<'a> Request<'a> {
         self.request_info.remote_user()
     }
 
-    pub fn remote_ip(&self) -> int {
-        self.request_info.remote_ip()
+    pub fn remote_ip(&self) -> IpAddr {
+        let ip = self.request_info.remote_ip();
+        Ipv4Addr((ip >> 24) as u8,
+                 (ip >> 16) as u8,
+                 (ip >>  8) as u8,
+                 (ip >>  0) as u8)
     }
 
-    pub fn remote_port(&self) -> int {
-        self.request_info.remote_port()
+    pub fn remote_port(&self) -> u16 {
+        self.request_info.remote_port() as u16
     }
 
     pub fn is_ssl(&self) -> bool {
@@ -113,7 +118,9 @@ pub struct Response<S, R> {
 }
 
 impl<S: ToStatusCode, R: Reader + Send> Response<S, R> {
-    pub fn new(status: S, headers: HashMap<String, String>, body: R) -> Response<S, R> {
+    pub fn new(status: S,
+               headers: HashMap<String, String>,
+               body: R) -> Response<S, R> {
         Response { status: status, headers: headers, body: body }
     }
 }
@@ -199,8 +206,15 @@ pub type ServerHandler<S, R> = fn(&mut Request) -> IoResult<Response<S, R>>;
 pub struct Server(raw::Server);
 
 impl Server {
-    pub fn start<S: ToStatusCode, R: Reader + Send>(options: Config, handler: ServerHandler<S, R>) -> IoResult<Server> {
-        fn internal_handler<S: ToStatusCode, R: Reader + Send>(conn: &mut raw::Connection, callback: &ServerHandler<S, R>) -> Result<(), ()> {
+    pub fn start<S: ToStatusCode, R: Reader + Send>(options: Config,
+                                                    handler: ServerHandler<S, R>)
+        -> IoResult<Server>
+    {
+        fn internal_handler<S: ToStatusCode, R: Reader + Send>(
+            conn: &mut raw::Connection,
+            callback: &ServerHandler<S, R>)
+            -> Result<(), ()>
+        {
             let mut connection = Connection::new(conn).unwrap();
             let response = (*callback)(&mut connection.request);
             let writer = &mut connection;
@@ -209,21 +223,19 @@ impl Server {
                 let _ = writeln!(writer, "HTTP/1.1 500 Internal Server Error");
             }
 
-            match response {
-                Ok(Response { status, headers, mut body }) => {
-                    let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
-                    try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
+            let Response { status, headers, mut body } = match response {
+                Ok(r) => r,
+                Err(_) => return Err(err(writer)),
+            };
+            let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
+            try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
 
-                    for (key, value) in headers.iter() {
-                        try!(write!(writer, "{}: {}\r\n", key, value).map_err(|_| ()));
-                    }
-
-                    try!(write!(writer, "\r\n").map_err(|_| ()));
-                    try!(util::copy(&mut body, writer).map_err(|_| ()));
-                },
-
-                Err(_) => return Err(err(writer))
+            for (key, value) in headers.iter() {
+                try!(write!(writer, "{}: {}\r\n", key, value).map_err(|_| ()));
             }
+
+            try!(write!(writer, "\r\n").map_err(|_| ()));
+            try!(util::copy(&mut body, writer).map_err(|_| ()));
 
             Ok(())
         }
@@ -243,7 +255,9 @@ fn write_bytes(connection: &raw::Connection, bytes: &[u8]) -> Result<(), String>
     Ok(())
 }
 
-fn request_info<'a>(connection: &'a raw::Connection) -> Result<RequestInfo<'a>, String> {
+fn request_info<'a>(connection: &'a raw::Connection)
+    -> Result<RequestInfo<'a>, String>
+{
     match get_request_info(connection) {
         Some(info) => Ok(info),
         None => Err("Couldn't get request info for connection".to_str())

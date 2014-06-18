@@ -16,13 +16,17 @@ impl Config {
     }
 }
 
-#[link(name="civetweb")]
+#[link(name = "civetweb", kind = "static")]
 extern {
-    fn mg_start(callbacks: *MgCallbacks, user_data: *c_void, options: **c_char) -> *MgContext;
+    fn mg_start(callbacks: *MgCallbacks, user_data: *c_void,
+                options: **c_char) -> *MgContext;
     fn mg_stop(context: *MgContext);
-    fn mg_set_request_handler(context: *MgContext, uri: *c_char, handler: MgRequestHandler, data: *c_void);
-    fn mg_read(connection: *mut MgConnection, buf: *c_void, len: size_t) -> c_int;
-    fn mg_write(connection: *mut MgConnection, data: *c_void, len: size_t) -> c_int;
+    fn mg_set_request_handler(context: *MgContext, uri: *c_char,
+                              handler: MgRequestHandler, data: *c_void);
+    fn mg_read(connection: *mut MgConnection, buf: *c_void,
+               len: size_t) -> c_int;
+    fn mg_write(connection: *mut MgConnection, data: *c_void,
+                len: size_t) -> c_int;
     fn mg_get_header(connection: *mut MgConnection, name: *c_char) -> *c_char;
     fn mg_get_request_info(connection: *mut MgConnection) -> *MgRequestInfo;
 }
@@ -36,8 +40,9 @@ pub struct ServerCallback<T> {
     param: T
 }
 
-impl<T> ServerCallback<T> {
-    pub fn new(callback: fn(&mut Connection, &T) -> Result<(), ()>, param: T) -> ServerCallback<T> {
+impl<T: Share> ServerCallback<T> {
+    pub fn new(callback: fn(&mut Connection, &T) -> Result<(), ()>,
+               param: T) -> ServerCallback<T> {
         ServerCallback { callback: callback, param: param }
     }
 }
@@ -47,21 +52,24 @@ impl Server {
         match *self { Server(context) => unsafe { &*context } }
     }
 
-    pub fn start<T: 'static>(options: Config, callback: ServerCallback<T>) -> Server {
+    pub fn start<T: 'static + Share>(options: Config,
+                                     callback: ServerCallback<T>) -> Server {
         let Config { port, threads } = options;
-        let options = ["listening_ports".to_str(), port.to_str(), "num_threads".to_str(), threads.to_str()];
+        let options = vec!(
+            "listening_ports".to_c_str(), port.to_str().to_c_str(),
+            "num_threads".to_c_str(), threads.to_str().to_c_str(),
+        );
+        let mut ptrs: Vec<_> = options.iter().map(|a| a.with_ref(|p| p)).collect();
+        ptrs.push(0 as *_);
 
-        let mut server = None;
-        let mut cb = Some(box callback);
-
-        options.with_c_strs(true, |options| {
-            let context = start(options);
-            server = Some(Server(context));
-
-            unsafe { mg_set_request_handler(context, "**".to_c_str().unwrap(), raw_handler::<T>, transmute(cb.take_unwrap())) }
-        });
-
-        server.unwrap()
+        let context = start(ptrs.as_ptr());
+        let uri = "**".to_c_str();
+        unsafe {
+            mg_set_request_handler(context, uri.with_ref(|p| p),
+                                   raw_handler::<T>,
+                                   transmute(box callback));
+        }
+        Server(context)
     }
 }
 
@@ -72,20 +80,14 @@ impl Drop for Server {
 }
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *c_void) -> int {
-    let (tx, rx) = channel();
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
-
-    let mut task = native::task::new((0, std::uint::MAX));
-    task.death.on_exit = Some(proc(r) tx.send(r));
-
+    let task = native::task::new((0, std::uint::MAX));
     let mut result = None;
 
     task.run(|| {
         let mut connection = Connection(conn);
         result = Some((callback.callback)(&mut connection, &callback.param));
     });
-
-    let _ = rx.recv();
 
     match result {
         None => 0,
@@ -106,7 +108,7 @@ impl Connection {
 
 type MgRequestHandler = fn(*mut MgConnection, *c_void) -> int;
 
-#[allow(dead_code)]
+#[repr(C)]
 struct MgHeader {
     name: *c_char,
     value: *c_char
@@ -128,6 +130,7 @@ impl<'a> Header<'a> {
     }
 }
 
+#[repr(C)]
 struct MgRequestInfo {
     request_method: *c_char,
     uri: *c_char,
@@ -136,11 +139,9 @@ struct MgRequestInfo {
     remote_user: *c_char,
     remote_ip: c_long,
     remote_port: c_int,
-    is_ssl: bool,
+    is_ssl: c_int,
 
-    #[allow(dead_code)]
     user_data: *c_void,
-    #[allow(dead_code)]
     conn_data: *c_void,
 
     num_headers: c_int,
@@ -187,11 +188,11 @@ impl<'a> RequestInfo<'a> {
     }
 
     pub fn is_ssl(&self) -> bool {
-        self.as_ref().is_ssl
+        self.as_ref().is_ssl != 0
     }
 }
 
-#[allow(dead_code)]
+#[repr(C)]
 struct MgCallbacks {
     begin_request: *c_void,
     end_request: *c_void,
@@ -244,12 +245,12 @@ pub fn start(options: **c_char) -> *MgContext {
 }
 
 pub fn read(conn: &Connection, buf: &mut [u8]) -> i32 {
-    unsafe { mg_read(conn.unwrap(), buf.as_ptr() as *c_void, buf.len() as u64) }
+    unsafe { mg_read(conn.unwrap(), buf.as_ptr() as *c_void, buf.len() as size_t) }
 }
 
 pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
     let c_bytes = bytes.as_ptr() as *c_void;
-    unsafe { mg_write(conn.unwrap(), c_bytes, bytes.len() as u64) }
+    unsafe { mg_write(conn.unwrap(), c_bytes, bytes.len() as size_t) }
 }
 
 pub fn get_header(conn: &Connection, string: &str) -> Option<String> {
@@ -266,20 +267,5 @@ pub fn get_headers<'a>(conn: &'a Connection) -> Vec<Header<'a>> {
     match get_request_info(conn) {
         Some(info) => info.as_ref().headers.iter().map(|h| Header(h)).collect(),
         None => vec!()
-    }
-}
-
-trait WithCStrs {
-    fn with_c_strs(&self, null_terminated: bool, f: |**c_char|) ;
-}
-
-impl<'a, T: ToCStr> WithCStrs for &'a [T] {
-    fn with_c_strs(&self, null_terminate: bool, f: |**c_char|) {
-        let c_strs: Vec<CString> = self.iter().map(|s: &T| s.to_c_str()).collect();
-        let mut ptrs: Vec<*c_char> = c_strs.iter().map(|c: &CString| c.with_ref(|ptr| ptr)).collect();
-        if null_terminate {
-            ptrs.push(null());
-        }
-        f(ptrs.as_ptr())
     }
 }

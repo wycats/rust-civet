@@ -1,6 +1,8 @@
 #![feature(macro_rules)]
 
 extern crate civet;
+extern crate green;
+extern crate rustuv;
 
 use std::io::{IoResult,MemReader,MemWriter};
 use std::collections::HashMap;
@@ -15,16 +17,31 @@ macro_rules! http_write(
 
 fn main() {
     let _a = Server::start(Config { port: 8888, threads: 50 }, handler);
+    wait_for_sigint();
+}
 
-    loop {
-        std::io::timer::sleep(1000);
-    }
+// libnative doesn't have signal handling yet
+fn wait_for_sigint() {
+    use std::io::signal::{Listener, Interrupt};
+    use std::rt::task::TaskOpts;
+    use green::{SchedPool, PoolConfig};
+
+    let mut config = PoolConfig::new();
+    config.event_loop_factory = rustuv::event_loop;
+
+    let mut pool = SchedPool::new(config);
+    pool.spawn(TaskOpts::new(), proc() {
+        let mut l = Listener::new();
+        l.register(Interrupt).unwrap();
+        l.rx.recv();
+    });
+    pool.shutdown();
 }
 
 fn handler(req: &mut Request) -> IoResult<Response<int, MemReader>> {
     let mut res = MemWriter::with_capacity(10000);
 
-    http_write!(res, "<style>body \\{ font-family: sans-serif; \\}</style>");
+    http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
     http_write!(res, "<p>Method: {}</p>", req.method());
     http_write!(res, "<p>URL: {}</p>", req.url());
     http_write!(res, "<p>HTTP: {}</p>", req.http_version());
