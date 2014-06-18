@@ -206,18 +206,27 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
     }
 }
 
-pub type ServerHandler = fn(&mut Request) -> IoResult<Response>;
+pub trait Handler {
+    fn call(&self, req: &mut Request) -> IoResult<Response>;
+}
 
-pub struct Server(raw::Server<ServerHandler>);
+impl Handler for fn(&mut Request) -> IoResult<Response> {
+    fn call(&self, req: &mut Request) -> IoResult<Response> {
+        (*self)(req)
+    }
+}
+
+// TODO: Why is 'static needed here and below?
+pub struct Server(raw::Server<Box<Handler + 'static + Share>>);
 
 impl Server {
-    pub fn start(options: Config, handler: ServerHandler)
+    pub fn start<H: 'static + Handler + Share>(options: Config, handler: H)
         -> IoResult<Server>
     {
         fn internal_handler(conn: &mut raw::Connection,
-                            callback: &ServerHandler) -> Result<(), ()> {
+                            handler: &Box<Handler>) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
-            let response = (*callback)(&mut connection.request);
+            let response = handler.call(&mut connection.request);
             let writer = &mut connection;
 
             fn err<W: Writer>(writer: &mut W) {
@@ -241,7 +250,8 @@ impl Server {
             Ok(())
         }
 
-        let raw_callback = raw::ServerCallback::new(internal_handler, handler);
+        let raw_callback = raw::ServerCallback::new(internal_handler,
+                                                    box handler);
         Ok(Server(try!(raw::Server::start(options, raw_callback))))
     }
 }
@@ -268,7 +278,7 @@ fn request_info<'a>(connection: &'a raw::Connection)
 #[cfg(test)]
 mod test {
     use std::io::test::next_test_ip4;
-    use super::{Server, Config, Request, Response};
+    use super::{Server, Config, Request, Response, Handler};
     use std::io::IoResult;
 
     fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
@@ -286,5 +296,23 @@ mod test {
         assert!(s1.is_ok());
         let s2 = Server::start(Config { port: addr.port, threads: 1 }, noop);
         assert!(s2.is_err());
+    }
+
+    #[test]
+    fn drops_handler() {
+        static mut DROPPED: bool = false;
+        struct Foo;
+        impl Handler for Foo {
+            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+                fail!()
+            }
+        }
+        impl Drop for Foo {
+            fn drop(&mut self) { unsafe { DROPPED = true; } }
+        }
+
+        let addr = next_test_ip4();
+        drop(Server::start(Config { port: addr.port, threads: 1 }, Foo));
+        unsafe { assert!(DROPPED); }
     }
 }
