@@ -208,7 +208,6 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
 
 pub type ServerHandler = fn(&mut Request) -> IoResult<Response>;
 
-#[allow(dead_code)]
 pub struct Server(raw::Server<ServerHandler>);
 
 impl Server {
@@ -243,7 +242,7 @@ impl Server {
         }
 
         let raw_callback = raw::ServerCallback::new(internal_handler, handler);
-        Ok(Server(raw::Server::start(options, raw_callback)))
+        Ok(Server(try!(raw::Server::start(options, raw_callback))))
     }
 }
 
@@ -266,3 +265,26 @@ fn request_info<'a>(connection: &'a raw::Connection)
     }
 }
 
+#[cfg(test)]
+mod test {
+    use std::io::test::next_test_ip4;
+    use super::{Server, Config, Request, Response};
+    use std::io::IoResult;
+
+    fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
+
+    #[test]
+    fn smoke() {
+        let addr = next_test_ip4();
+        Server::start(Config { port: addr.port, threads: 1 }, noop).unwrap();
+    }
+
+    #[test]
+    fn dupe_port() {
+        let addr = next_test_ip4();
+        let s1 = Server::start(Config { port: addr.port, threads: 1 }, noop);
+        assert!(s1.is_ok());
+        let s2 = Server::start(Config { port: addr.port, threads: 1 }, noop);
+        assert!(s2.is_err());
+    }
+}

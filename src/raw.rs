@@ -1,12 +1,13 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
 use native;
 use std::c_str::CString;
+use std::io;
 use std::mem::transmute;
 use std::ptr::null;
 use std;
 
 pub struct Config {
-    pub port: uint,
+    pub port: u16,
     pub threads: uint
 }
 
@@ -37,7 +38,7 @@ pub struct Server<T>(*MgContext, Box<ServerCallback<T>>);
 
 pub struct ServerCallback<T> {
     callback: fn(&mut Connection, &T) -> Result<(), ()>,
-    param: T
+    param: T,
 }
 
 impl<T: Share> ServerCallback<T> {
@@ -53,7 +54,8 @@ impl<T: 'static + Share> Server<T> {
         unsafe { &*context }
     }
 
-    pub fn start(options: Config, callback: ServerCallback<T>) -> Server<T> {
+    pub fn start(options: Config,
+                 callback: ServerCallback<T>) -> io::IoResult<Server<T>> {
         let Config { port, threads } = options;
         let options = vec!(
             "listening_ports".to_c_str(), port.to_str().to_c_str(),
@@ -63,6 +65,9 @@ impl<T: 'static + Share> Server<T> {
         ptrs.push(0 as *_);
 
         let context = start(ptrs.as_ptr());
+        // TODO: fill in this error
+        if context.is_null() { return Err(io::standard_error(io::OtherIoError)) }
+
         let uri = "**".to_c_str();
         let callback = box callback;
         unsafe {
@@ -70,7 +75,7 @@ impl<T: 'static + Share> Server<T> {
                                    raw_handler::<T>,
                                    &*callback as *_ as *c_void);
         }
-        Server(context, callback)
+        Ok(Server(context, callback))
     }
 }
 

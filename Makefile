@@ -40,6 +40,10 @@ src/civetweb/libcivetweb.a: src/civetweb/Makefile
 $(BUILD):
 	@mkdir -p $@
 
+check: $(CIVETWEB)
+	$(RUSTC) $(RUSTFLAGS) --test src/lib.rs --out-dir $(BUILD)
+	./$(BUILD)/civet
+
 clean:
 	rm -rf $(BUILD)
 	$(MAKE) -C src/civetweb distclean
