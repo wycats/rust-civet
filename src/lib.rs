@@ -209,7 +209,7 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
 pub type ServerHandler = fn(&mut Request) -> IoResult<Response>;
 
 #[allow(dead_code)]
-pub struct Server(raw::Server);
+pub struct Server(raw::Server<ServerHandler>);
 
 impl Server {
     pub fn start(options: Config, handler: ServerHandler)

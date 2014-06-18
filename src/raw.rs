@@ -1,9 +1,9 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
-use std;
-use std::c_str::CString;
-use std::ptr::null;
-use std::mem::transmute;
 use native;
+use std::c_str::CString;
+use std::mem::transmute;
+use std::ptr::null;
+use std;
 
 pub struct Config {
     pub port: uint,
@@ -33,7 +33,7 @@ extern {
 
 enum MgContext {}
 
-pub struct Server(*MgContext);
+pub struct Server<T>(*MgContext, Box<ServerCallback<T>>);
 
 pub struct ServerCallback<T> {
     callback: fn(&mut Connection, &T) -> Result<(), ()>,
@@ -47,13 +47,13 @@ impl<T: Share> ServerCallback<T> {
     }
 }
 
-impl Server {
+impl<T: 'static + Share> Server<T> {
     fn as_ref<'a>(&'a self) -> &'a MgContext {
-        match *self { Server(context) => unsafe { &*context } }
+        let Server(context, _) = *self;
+        unsafe { &*context }
     }
 
-    pub fn start<T: 'static + Share>(options: Config,
-                                     callback: ServerCallback<T>) -> Server {
+    pub fn start(options: Config, callback: ServerCallback<T>) -> Server<T> {
         let Config { port, threads } = options;
         let options = vec!(
             "listening_ports".to_c_str(), port.to_str().to_c_str(),
@@ -64,16 +64,18 @@ impl Server {
 
         let context = start(ptrs.as_ptr());
         let uri = "**".to_c_str();
+        let callback = box callback;
         unsafe {
             mg_set_request_handler(context, uri.with_ref(|p| p),
                                    raw_handler::<T>,
-                                   transmute(box callback));
+                                   &*callback as *_ as *c_void);
         }
-        Server(context)
+        Server(context, callback)
     }
 }
 
-impl Drop for Server {
+#[unsafe_destructor]
+impl<T: 'static + Share> Drop for Server<T> {
     fn drop(&mut self) {
         unsafe { mg_stop(self.as_ref()) }
     }
