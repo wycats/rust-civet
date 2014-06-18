@@ -111,17 +111,21 @@ impl<'a> Request<'a> {
     }
 }
 
-pub struct Response<S, R> {
-    status: S,
+pub struct Response<R> {
+    status: status::StatusCode,
     headers: HashMap<String, String>,
     body: R
 }
 
-impl<S: ToStatusCode, R: Reader + Send> Response<S, R> {
-    pub fn new(status: S,
-               headers: HashMap<String, String>,
-               body: R) -> Response<S, R> {
-        Response { status: status, headers: headers, body: body }
+impl<R: Reader + Send> Response<R> {
+    pub fn new<S: ToStatusCode>(status: S,
+                                headers: HashMap<String, String>,
+                                body: R) -> Response<R> {
+        Response {
+            status: status.to_status().unwrap(),
+            headers: headers,
+            body: body,
+        }
     }
 }
 
@@ -200,19 +204,18 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
     }
 }
 
-pub type ServerHandler<S, R> = fn(&mut Request) -> IoResult<Response<S, R>>;
+pub type ServerHandler<R> = fn(&mut Request) -> IoResult<Response<R>>;
 
 #[allow(dead_code)]
 pub struct Server(raw::Server);
 
 impl Server {
-    pub fn start<S: ToStatusCode, R: Reader + Send>(options: Config,
-                                                    handler: ServerHandler<S, R>)
+    pub fn start<R: Reader + Send>(options: Config, handler: ServerHandler<R>)
         -> IoResult<Server>
     {
-        fn internal_handler<S: ToStatusCode, R: Reader + Send>(
+        fn internal_handler<R: Reader + Send>(
             conn: &mut raw::Connection,
-            callback: &ServerHandler<S, R>)
+            callback: &ServerHandler<R>)
             -> Result<(), ()>
         {
             let mut connection = Connection::new(conn).unwrap();
@@ -227,7 +230,7 @@ impl Server {
                 Ok(r) => r,
                 Err(_) => return Err(err(writer)),
             };
-            let (code, string) = try!(status.to_status().map_err(|_| err(writer)));
+            let (code, string) = status.to_code();
             try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
 
             for (key, value) in headers.iter() {
