@@ -21,7 +21,7 @@ fn main() {
     }
 }
 
-fn handler(req: &mut Request) -> IoResult<Response<int, ChanReader>> {
+fn handler(req: &mut Request) -> IoResult<Response> {
     let (sender, receiver) = channel();
 
     // copy the request out of the pointer so it can be sent across
