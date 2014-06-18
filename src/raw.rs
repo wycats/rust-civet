@@ -256,7 +256,10 @@ pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
 }
 
 pub fn get_header(conn: &Connection, string: &str) -> Option<String> {
-    let cstr = unsafe { mg_get_header(conn.unwrap(), string.to_c_str().unwrap()).to_option() };
+    let string = string.to_c_str();
+    let cstr = unsafe {
+        mg_get_header(conn.unwrap(), string.with_ref(|p| p)).to_option()
+    };
 
     cstr.map(|c| unsafe { CString::new(c, false) }.as_str().to_str())
 }
