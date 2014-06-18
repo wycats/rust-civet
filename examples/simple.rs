@@ -28,6 +28,7 @@ fn wait_for_sigint() {
 
     let mut config = PoolConfig::new();
     config.event_loop_factory = rustuv::event_loop;
+    config.threads = 1;
 
     let mut pool = SchedPool::new(config);
     pool.spawn(TaskOpts::new(), proc() {
@@ -38,7 +39,7 @@ fn wait_for_sigint() {
     pool.shutdown();
 }
 
-fn handler(req: &mut Request) -> IoResult<Response<int, MemReader>> {
+fn handler(req: &mut Request) -> IoResult<Response> {
     let mut res = MemWriter::with_capacity(10000);
 
     http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");

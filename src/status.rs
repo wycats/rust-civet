@@ -42,7 +42,8 @@ pub enum StatusCode {
     BadGateway,
     ServiceUnavailable,
     GatewayTimeout,
-    HttpVersionNotSupported
+    HttpVersionNotSupported,
+    Other(uint, &'static str),
 }
 
 impl StatusCode {
@@ -91,87 +92,89 @@ impl StatusCode {
             BadGateway => (502, "Bad Gateway"),
             ServiceUnavailable => (503, "Service Unavailable"),
             GatewayTimeout => (504, "Gateway Timeout"),
-            HttpVersionNotSupported => (505, "HTTP Version Not Supported")
+            HttpVersionNotSupported => (505, "HTTP Version Not Supported"),
+            Other(n, s) => (n, s),
         }
     }
 }
 
 pub trait ToStatusCode {
-    fn to_status(&self) -> Result<(uint, &'static str), ()>;
+    fn to_status(&self) -> Result<StatusCode, ()>;
 }
 
 impl ToStatusCode for StatusCode {
-    fn to_status(&self) -> Result<(uint, &'static str), ()> {
-        Ok(self.to_code())
-    }
-}
-
-impl ToStatusCode for (uint, &'static str) {
-    fn to_status(&self) -> Result<(uint, &'static str), ()> {
+    fn to_status(&self) -> Result<StatusCode, ()> {
         Ok(*self)
     }
 }
 
+impl ToStatusCode for (uint, &'static str) {
+    fn to_status(&self) -> Result<StatusCode, ()> {
+        let (code, name) = *self;
+        Ok(Other(code, name))
+    }
+}
+
 impl ToStatusCode for int {
-    fn to_status(&self) -> Result<(uint, &'static str), ()> {
+    fn to_status(&self) -> Result<StatusCode, ()> {
         (*self as uint).to_status()
     }
 }
 
 impl ToStatusCode for uint {
-    fn to_status(&self) -> Result<(uint, &'static str), ()> {
+    fn to_status(&self) -> Result<StatusCode, ()> {
         match *self {
-            num @ 102 .. 199 => Ok((num, "Informational")),
-            num @ 207 .. 299 => Ok((num, "Successful")),
-            num @ 306 | num @ 308 .. 399 => Ok((num, "Redirection")),
-            num @ 402 | num @ 418 .. 499 => Ok((num, "Client Error")),
-            num @ 506 .. 599 => Ok((num, "Server Error")),
-            100 => Continue.to_status(),
-            101 => SwitchingProtocols.to_status(),
-            200 => OK.to_status(),
-            201 => Created.to_status(),
-            202 => Accepted.to_status(),
-            203 => NonAuthoritativeInformation.to_status(),
-            204 => NoContent.to_status(),
-            205 => ResetContent.to_status(),
-            206 => PartialContent.to_status(),
-            300 => MultipleChoices.to_status(),
-            301 => MovedPermanently.to_status(),
-            302 => Found.to_status(),
-            303 => SeeOther.to_status(),
-            304 => NotModified.to_status(),
-            305 => UseProxy.to_status(),
-            307 => TemporaryRedirect.to_status(),
-            400 => BadRequest.to_status(),
-            401 => Unauthorized.to_status(),
-            403 => Forbidden.to_status(),
-            404 => NotFound.to_status(),
-            405 => MethodNotAllowed.to_status(),
-            406 => NotAcceptable.to_status(),
-            407 => ProxyAuthenticationRequired.to_status(),
-            408 => RequestTimeout.to_status(),
-            409 => Conflict.to_status(),
-            410 => Gone.to_status(),
-            411 => LengthRequired.to_status(),
-            412 => PreconditionFailed.to_status(),
-            413 => RequestEntityTooLarge.to_status(),
-            414 => RequestUriTooLong.to_status(),
-            415 => UnsupportedMediaType.to_status(),
-            416 => RequestedRangeNotSatisfiable.to_status(),
-            417 => ExpectationFailed.to_status(),
-            500 => InternalServerError.to_status(),
-            501 => NotImplemented.to_status(),
-            502 => BadGateway.to_status(),
-            503 => ServiceUnavailable.to_status(),
-            504 => GatewayTimeout.to_status(),
-            505 => HttpVersionNotSupported.to_status(),
+            num @ 102 .. 199 => Ok(Informational(num, "Informational")),
+            num @ 207 .. 299 => Ok(Successful(num, "Successful")),
+            num @ 306 | num @ 308 .. 399 => Ok(Redirection(num, "Redirection")),
+            num @ 402 | num @ 418 .. 499 => Ok(ClientError(num, "Client Error")),
+            num @ 506 .. 599 => Ok(ServerError(num, "Server Error")),
+            100 => Ok(Continue),
+            101 => Ok(SwitchingProtocols),
+            200 => Ok(OK),
+            201 => Ok(Created),
+            202 => Ok(Accepted),
+            203 => Ok(NonAuthoritativeInformation),
+            204 => Ok(NoContent),
+            205 => Ok(ResetContent),
+            206 => Ok(PartialContent),
+            300 => Ok(MultipleChoices),
+            301 => Ok(MovedPermanently),
+            302 => Ok(Found),
+            303 => Ok(SeeOther),
+            304 => Ok(NotModified),
+            305 => Ok(UseProxy),
+            307 => Ok(TemporaryRedirect),
+            400 => Ok(BadRequest),
+            401 => Ok(Unauthorized),
+            403 => Ok(Forbidden),
+            404 => Ok(NotFound),
+            405 => Ok(MethodNotAllowed),
+            406 => Ok(NotAcceptable),
+            407 => Ok(ProxyAuthenticationRequired),
+            408 => Ok(RequestTimeout),
+            409 => Ok(Conflict),
+            410 => Ok(Gone),
+            411 => Ok(LengthRequired),
+            412 => Ok(PreconditionFailed),
+            413 => Ok(RequestEntityTooLarge),
+            414 => Ok(RequestUriTooLong),
+            415 => Ok(UnsupportedMediaType),
+            416 => Ok(RequestedRangeNotSatisfiable),
+            417 => Ok(ExpectationFailed),
+            500 => Ok(InternalServerError),
+            501 => Ok(NotImplemented),
+            502 => Ok(BadGateway),
+            503 => Ok(ServiceUnavailable),
+            504 => Ok(GatewayTimeout),
+            505 => Ok(HttpVersionNotSupported),
             _ => Err(())
         }
     }
 }
 
 impl ToStatusCode for () {
-    fn to_status(&self) -> Result<(uint, &'static str), ()> {
+    fn to_status(&self) -> Result<StatusCode, ()> {
         Err(())
     }
 }
