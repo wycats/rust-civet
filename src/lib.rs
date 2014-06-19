@@ -21,7 +21,8 @@ mod raw;
 pub mod status;
 
 pub struct Connection<'a> {
-    request: Request<'a>
+    request: Request<'a>,
+    written: bool,
 }
 
 pub struct Request<'a> {
@@ -137,7 +138,8 @@ impl<'a> Connection<'a> {
             Ok(info) => {
                 let request = Request { conn: conn, request_info: info };
                 Ok(Connection {
-                    request: request
+                    request: request,
+                    written: false,
                 })
             },
             Err(err) => Err(err)
@@ -148,6 +150,7 @@ impl<'a> Connection<'a> {
 
 impl<'a> Writer for Connection<'a> {
     fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+        self.written = true;
         write_bytes(self.request.conn, buf).map_err(|_| {
             io::standard_error(io::IoUnavailable)
         })
@@ -162,6 +165,15 @@ impl<'a> Reader for Request<'a> {
             Err(io::standard_error(io::EndOfFile))
         } else {
             Ok(ret as uint)
+        }
+    }
+}
+
+#[unsafe_destructor]
+impl<'a> Drop for Connection<'a> {
+    fn drop(&mut self) {
+        if !self.written {
+            let _ = writeln!(self, "HTTP/1.1 500 Internal Server Error");
         }
     }
 }
@@ -388,5 +400,25 @@ GET / HTTP/1.1
 Foo: bar
 
 ");
+    }
+
+    #[test]
+    fn failing_handler_is_500() {
+        struct Foo;
+        impl Handler for Foo {
+            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+                fail!()
+            }
+        }
+
+        let addr = next_test_ip4();
+        let _s = Server::start(Config { port: addr.port, threads: 1 }, Foo);
+        let response = request(addr, r"
+GET / HTTP/1.1
+Foo: bar
+
+");
+        assert!(response.as_slice().contains("500 Internal"),
+                "not a failing response: {}", response);
     }
 }
