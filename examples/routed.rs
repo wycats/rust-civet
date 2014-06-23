@@ -35,15 +35,15 @@ fn main() {
 
 // libnative doesn't have signal handling yet
 fn wait_for_sigint() {
+    use green::{SchedPool, PoolConfig, GreenTaskBuilder};
     use std::io::signal::{Listener, Interrupt};
-    use std::rt::task::TaskOpts;
-    use green::{SchedPool, PoolConfig};
+    use std::task::TaskBuilder;
 
     let mut config = PoolConfig::new();
     config.event_loop_factory = rustuv::event_loop;
 
     let mut pool = SchedPool::new(config);
-    pool.spawn(TaskOpts::new(), proc() {
+    TaskBuilder::new().green(&mut pool).spawn(proc() {
         let mut l = Listener::new();
         l.register(Interrupt).unwrap();
         l.rx.recv();

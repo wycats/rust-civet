@@ -1,5 +1,6 @@
 #![crate_id="civet"]
 #![crate_type="rlib"]
+#![feature(unsafe_destructor)]
 
 extern crate libc;
 extern crate debug;

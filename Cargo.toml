@@ -7,9 +7,8 @@ build = "make -f cargo.mk"
 
 [dependencies.route-recognizer]
 
-name = "route-recognizer"
 version = "0.1.0"
-git = "git://github.com/alexcrichton/route-recognizer.rs"
+git = "git://github.com/wycats/route-recognizer.rs"
 
 [[bin]]
 
