@@ -1,0 +1,31 @@
+[project]
+
+name = "civet"
+version = "0.1.0"
+authors = ["wycats"]
+build = "make -f cargo.mk"
+
+[dependencies.route-recognizer]
+
+version = "0.1.0"
+git = "git://github.com/wycats/route-recognizer.rs"
+
+[[bin]]
+
+name = "channel_response"
+path = "examples/channel_response.rs"
+
+[[bin]]
+
+name = "simple"
+path = "examples/simple.rs"
+
+[[bin]]
+
+name = "routed"
+path = "examples/routed.rs"
+
+[[lib]]
+
+name = "civet"
+path = "src/lib.rs"
