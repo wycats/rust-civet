@@ -162,10 +162,6 @@ impl<'a> RequestInfo<'a> {
         match *self { RequestInfo(info) => unsafe { &*info } }
     }
 
-    pub fn num_headers(&self) -> int {
-        self.as_ref().num_headers as int
-    }
-
     pub fn method<'a>(&'a self) -> Option<&'a str> {
         to_slice(self.as_ref(), |info| info.request_method)
     }
@@ -182,16 +178,8 @@ impl<'a> RequestInfo<'a> {
         to_slice(self.as_ref(), |info| info.query_string)
     }
 
-    pub fn remote_user<'a>(&'a self) -> Option<&'a str> {
-        to_slice(self.as_ref(), |info| info.remote_user)
-    }
-
     pub fn remote_ip(&self) -> int {
         self.as_ref().remote_ip as int
-    }
-
-    pub fn remote_port(&self) -> int {
-        self.as_ref().remote_port as int
     }
 
     pub fn is_ssl(&self) -> bool {
