@@ -8,8 +8,8 @@ extern crate rustuv;
 use std::io::{IoResult,MemReader,MemWriter};
 use std::collections::HashMap;
 
-use civet::{Config,Server,Response};
-use conduit::Request;
+use civet::{Config, Server, response};
+use conduit::{Request, Response};
 
 macro_rules! http_write(
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
@@ -64,9 +64,9 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     http_write!(res, "</ul>");
 
     let mut headers = HashMap::new();
-    headers.insert("Content-Type".to_str(), "text/html".to_str());
+    headers.insert("Content-Type".to_str(), vec!("text/html".to_str()));
 
     let body = MemReader::new(res.unwrap());
 
-    Ok(Response::new(200, headers, body))
+    Ok(response(200, headers, body))
 }

@@ -4,18 +4,18 @@ extern crate green;
 extern crate rustuv;
 extern crate routing = "route_recognizer";
 
-use std::io::{IoResult, MemReader};
+use std::io::{IoResult, IoError, MemReader};
 use std::collections::HashMap;
 
-use civet::{Config, Server, Response, Handler};
-use conduit::{Request};
+use civet::{Config, Server, response};
+use conduit::{Request, Response};
 use routing::{Router, Params};
 
 struct MyServer {
     router: Router<fn(&mut Request, &Params) -> IoResult<Response>>,
 }
 
-impl Handler for MyServer {
+impl conduit::Handler<IoError> for MyServer {
     fn call(&self, req: &mut Request) -> IoResult<Response> {
         let hit = match self.router.recognize(req.path()) {
             Ok(m) => m,
@@ -54,12 +54,13 @@ fn wait_for_sigint() {
 }
 
 fn root(_req: &mut Request, _params: &Params) -> IoResult<Response> {
-    let response = "you found the root!\n".as_bytes().to_owned();
-    Ok(Response::new(200, HashMap::new(), MemReader::new(response)))
+    let bytes = "you found the root!\n".as_bytes().to_owned();
+    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
 }
 
 fn id(_req: &mut Request, params: &Params) -> IoResult<Response> {
-    let response = format!("you found the id {}!\n", params["id"]);
-    let response = response.into_bytes();
-    Ok(Response::new(200, HashMap::new(), MemReader::new(response)))
+    let string = format!("you found the id {}!\n", params["id"]);
+    let bytes = string.into_bytes();
+
+    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
 }

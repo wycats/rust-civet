@@ -11,10 +11,10 @@ extern crate conduit;
 
 use std::io;
 use std::io::net::ip::{IpAddr, Ipv4Addr};
-use std::io::{IoResult,util};
+use std::io::{IoResult, util};
 use std::collections::HashMap;
 
-use conduit::{Request, HeaderEntries};
+use conduit::{Request, HeaderEntries, Handler};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
@@ -116,23 +116,13 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     }
 }
 
-pub struct Response {
-    status: status::StatusCode,
-    headers: HashMap<String, String>,
-    body: Box<Reader + Send>,
-}
-
-impl Response {
-    pub fn new<S: ToStatusCode, R: Reader + Send>(
-        status: S,
-        headers: HashMap<String, String>,
-        body: R) -> Response
-    {
-        Response {
-            status: status.to_status().unwrap(),
-            headers: headers,
-            body: box body,
-        }
+pub fn response<S: ToStatusCode, R: Reader + Send>(status: S,
+    headers: HashMap<String, Vec<String>>, body: R) -> conduit::Response
+{
+    conduit::Response {
+        status: status.to_status().unwrap().to_code(),
+        headers: headers,
+        body: box body as Box<Reader + Send>
     }
 }
 
@@ -226,25 +216,14 @@ impl<'a> Iterator<(&'a str, Vec<&'a str>)> for HeaderIterator<'a> {
     }
 }
 
-pub trait Handler {
-    fn call(&self, req: &mut Request) -> IoResult<Response>;
-}
+pub struct Server<E>(raw::Server<Box<Handler<E> + 'static + Share>>);
 
-impl Handler for fn(&mut Request) -> IoResult<Response> {
-    fn call(&self, req: &mut Request) -> IoResult<Response> {
-        (*self)(req)
-    }
-}
-
-// TODO: Why is 'static needed here and below?
-pub struct Server(raw::Server<Box<Handler + 'static + Share>>);
-
-impl Server {
-    pub fn start<H: 'static + Handler + Share>(options: Config, handler: H)
-        -> IoResult<Server>
+impl<E> Server<E> {
+    pub fn start<H: Handler<E> + 'static + Share>(options: Config, handler: H)
+        -> IoResult<Server<E>>
     {
-        fn internal_handler(conn: &mut raw::Connection,
-                            handler: &Box<Handler>) -> Result<(), ()> {
+        fn internal_handler<E>(conn: &mut raw::Connection,
+                            handler: &Box<Handler<E>>) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             let response = handler.call(&mut connection.request);
             let writer = &mut connection;
@@ -253,11 +232,11 @@ impl Server {
                 let _ = writeln!(writer, "HTTP/1.1 500 Internal Server Error");
             }
 
-            let Response { status, headers, mut body } = match response {
+            let conduit::Response { status, headers, mut body } = match response {
                 Ok(r) => r,
                 Err(_) => return Err(err(writer)),
             };
-            let (code, string) = status.to_code();
+            let (code, string) = status;
             try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
 
             for (key, value) in headers.iter() {
