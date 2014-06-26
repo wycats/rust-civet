@@ -62,11 +62,16 @@ impl<'a> conduit::Request for CivetRequest<'a> {
 
     fn method<'a>(&'a self) -> conduit::Method<'a> {
         match self.request_info.method().unwrap() {
+            "HEAD" => conduit::Head,
             "GET" => conduit::Get,
             "POST" => conduit::Post,
             "PUT" => conduit::Put,
             "DELETE" => conduit::Delete,
             "PATCH" => conduit::Patch,
+            "PURGE" => conduit::Purge,
+            "CONNECT" => conduit::Connect,
+            "OPTIONS" => conduit::Options,
+            "TRACE" => conduit::Trace,
             other @ _ => conduit::Other(other)
         }
     }
