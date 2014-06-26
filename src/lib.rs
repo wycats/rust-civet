@@ -6,11 +6,15 @@ extern crate libc;
 extern crate debug;
 extern crate native;
 extern crate collections;
+extern crate semver;
+extern crate conduit;
 
 use std::io;
 use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult,util};
 use std::collections::HashMap;
+
+use conduit::{Request, HeaderEntries};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
@@ -22,77 +26,76 @@ mod raw;
 pub mod status;
 
 pub struct Connection<'a> {
-    request: Request<'a>,
+    request: CivetRequest<'a>,
     written: bool,
 }
 
-pub struct Request<'a> {
+pub struct CivetRequest<'a> {
     conn: &'a raw::Connection,
-    request_info: RequestInfo<'a>
+    request_info: RequestInfo<'a>,
+    headers: Headers<'a>
 }
 
-pub struct CopiedRequest {
-    pub headers: HashMap<String, String>,
-    pub method: Option<String>,
-    pub url: Option<String>,
-    pub http_version: Option<String>,
-    pub query_string: Option<String>,
-    pub remote_user: Option<String>,
-    pub remote_ip: IpAddr,
-    pub remote_port: u16,
-    pub is_ssl: bool
+fn ver(major: uint, minor: uint) -> semver::Version {
+    semver::Version {
+        major: major,
+        minor: minor,
+        patch: 0,
+        pre: vec!(),
+        build: vec!()
+    }
 }
 
-impl<'a> Request<'a> {
-    pub fn copy(&self) -> CopiedRequest {
-        let mut headers = HashMap::new();
-
-        for (key, value) in self.headers().iter() {
-            headers.insert(key.to_str(), value.to_str());
-        }
-
-        CopiedRequest {
-            headers: headers,
-            method: self.method().map(|a| a.to_str()),
-            url: self.url().map(|a| a.to_str()),
-            http_version: self.http_version().map(|a| a.to_str()),
-            query_string: self.query_string().map(|a| a.to_str()),
-            remote_user: self.remote_user().map(|a| a.to_str()),
-            remote_ip: self.remote_ip(),
-            remote_port: self.remote_port(),
-            is_ssl: self.is_ssl()
+impl<'a> conduit::Request for CivetRequest<'a> {
+    fn http_version(&self) -> semver::Version {
+        let version = self.request_info.http_version().unwrap();
+        match version {
+            "1.0" => ver(1, 0),
+            "1.1" => ver(1, 1),
+            _ => ver(1, 1)
         }
     }
 
-    pub fn get_header<S: Str>(&mut self, string: S) -> Option<String> {
-        get_header(self.conn, string.as_slice())
+    fn conduit_version(&self) -> semver::Version {
+        ver(0, 1)
     }
 
-    pub fn count_headers(&self) -> uint {
-        self.request_info.num_headers() as uint
+    fn method<'a>(&'a self) -> conduit::Method<'a> {
+        match self.request_info.method().unwrap() {
+            "GET" => conduit::Get,
+            "POST" => conduit::Post,
+            "PUT" => conduit::Put,
+            "DELETE" => conduit::Delete,
+            "PATCH" => conduit::Patch,
+            other @ _ => conduit::Other(other)
+        }
     }
 
-    pub fn method<'a>(&'a self) -> Option<&'a str> {
-        self.request_info.method()
+    fn scheme(&self) -> conduit::Scheme {
+        if self.request_info.is_ssl() {
+            conduit::Https
+        } else {
+            conduit::Http
+        }
     }
 
-    pub fn url<'a>(&'a self) -> Option<&'a str> {
-        self.request_info.url()
+    fn host<'a>(&'a self) -> conduit::Host<'a> {
+        conduit::HostName(get_header(self.conn, "Host").unwrap())
     }
 
-    pub fn http_version<'a>(&'a self) -> Option<&'a str> {
-        self.request_info.http_version()
+    fn virtual_root<'a>(&'a self) -> Option<&'a str> {
+        None
     }
 
-    pub fn query_string<'a>(&'a self) -> Option<&'a str> {
+    fn path<'a>(&'a self) -> &'a str {
+        self.request_info.url().unwrap()
+    }
+
+    fn query_string<'a>(&'a self) -> Option<&'a str> {
         self.request_info.query_string()
     }
 
-    pub fn remote_user<'a>(&'a self) -> Option<&'a str> {
-        self.request_info.remote_user()
-    }
-
-    pub fn remote_ip(&self) -> IpAddr {
+    fn remote_ip(&self) -> IpAddr {
         let ip = self.request_info.remote_ip();
         Ipv4Addr((ip >> 24) as u8,
                  (ip >> 16) as u8,
@@ -100,16 +103,16 @@ impl<'a> Request<'a> {
                  (ip >>  0) as u8)
     }
 
-    pub fn remote_port(&self) -> u16 {
-        self.request_info.remote_port() as u16
+    fn content_length(&self) -> Option<uint> {
+        get_header(self.conn, "Content-Length").and_then(from_str)
     }
 
-    pub fn is_ssl(&self) -> bool {
-        self.request_info.is_ssl()
+    fn headers<'a>(&'a self) -> &'a conduit::Headers {
+        &self.headers as &conduit::Headers
     }
 
-    pub fn headers<'a>(&'a self) -> Headers<'a> {
-        Headers { conn: self.conn }
+    fn body<'a>(&'a mut self) -> &'a mut Reader {
+        self as &mut Reader
     }
 }
 
@@ -137,7 +140,7 @@ impl<'a> Connection<'a> {
     fn new<'a>(conn: &'a raw::Connection) -> Result<Connection<'a>, String> {
         match request_info(conn) {
             Ok(info) => {
-                let request = Request { conn: conn, request_info: info };
+                let request = CivetRequest { conn: conn, request_info: info, headers: Headers { conn: conn } };
                 Ok(Connection {
                     request: request,
                     written: false,
@@ -158,7 +161,7 @@ impl<'a> Writer for Connection<'a> {
     }
 }
 
-impl<'a> Reader for Request<'a> {
+impl<'a> Reader for CivetRequest<'a> {
     fn read(&mut self, buf: &mut[u8]) -> IoResult<uint> {
         let ret = raw::read(self.conn, buf);
 
@@ -183,13 +186,17 @@ pub struct Headers<'a> {
     conn: &'a raw::Connection
 }
 
-impl<'a> Headers<'a> {
-    pub fn find<S: Str>(&self, string: S) -> Option<String> {
-        get_header(self.conn, string.as_slice())
+impl<'a> conduit::Headers for Headers<'a> {
+    fn find<'a>(&'a self, string: &str) -> Option<Vec<&'a str>> {
+        get_header(self.conn, string).map(|s| vec!(s))
     }
 
-    pub fn iter<'a>(&'a self) -> HeaderIterator<'a> {
-        HeaderIterator::new(self.conn)
+    fn has(&self, string: &str) -> bool {
+        get_header(self.conn, string).is_some()
+    }
+
+    fn iter<'a>(&'a self) -> conduit::HeaderEntries<'a> {
+        box HeaderIterator::new(self.conn) as conduit::HeaderEntries<'a>
     }
 }
 
@@ -204,8 +211,8 @@ impl<'a> HeaderIterator<'a> {
     }
 }
 
-impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
-    fn next(&mut self) -> Option<(&'a str, &'a str)> {
+impl<'a> Iterator<(&'a str, Vec<&'a str>)> for HeaderIterator<'a> {
+    fn next(&mut self) -> Option<(&'a str, Vec<&'a str>)> {
         let pos = self.position;
         let headers = &self.headers;
 
@@ -214,7 +221,7 @@ impl<'a> Iterator<(&'a str, &'a str)> for HeaderIterator<'a> {
         } else {
             let header = headers.get(pos);
             self.position += 1;
-            header.name().map(|name| (name, header.value().unwrap()))
+            header.name().map(|name| (name, vec!(header.value().unwrap())))
         }
     }
 }

@@ -1,13 +1,15 @@
 #![feature(macro_rules)]
 
 extern crate civet;
+extern crate conduit;
 extern crate green;
 extern crate rustuv;
 
 use std::io::{IoResult,MemReader,MemWriter};
 use std::collections::HashMap;
 
-use civet::{Config,Server,Request,Response};
+use civet::{Config,Server,Response};
+use conduit::Request;
 
 macro_rules! http_write(
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
@@ -42,17 +44,16 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     let mut res = MemWriter::with_capacity(10000);
 
     http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
+    http_write!(res, "<p>HTTP {}</p>", req.http_version());
     http_write!(res, "<p>Method: {}</p>", req.method());
-    http_write!(res, "<p>URL: {}</p>", req.url());
-    http_write!(res, "<p>HTTP: {}</p>", req.http_version());
-    http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
-    http_write!(res, "<p>Remote Port: {}</p>", req.remote_port());
-    http_write!(res, "<p>Remote User: {}</p>", req.remote_user());
+    http_write!(res, "<p>Scheme: {}</p>", req.scheme());
+    http_write!(res, "<p>Host: {}</p>", req.host());
+    http_write!(res, "<p>Path: {}</p>", req.path());
     http_write!(res, "<p>Query String: {}</p>", req.query_string());
-    http_write!(res, "<p>SSL?: {}</p>", req.is_ssl());
-    http_write!(res, "<p>Header Count: {}</p>", req.count_headers());
-    http_write!(res, "<p>User Agent: {}</p>", req.headers().find("User-Agent"));
-    http_write!(res, "<p>Input: {}</p>", try!(req.read_to_str()));
+    http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
+    http_write!(res, "<p>Content Length: {}</p>", req.content_length());
+
+    http_write!(res, "<p>Input: {}", req.body().read_to_str());
 
     http_write!(res, "<h2>Headers</h2><ul>");
 

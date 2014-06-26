@@ -234,7 +234,7 @@ impl MgCallbacks {
     }
 }
 
-fn to_slice<'a, T>(obj: &'a T, callback: |&'a T|:'static -> *c_char) -> Option<&'a str> {
+fn to_slice<'a, T>(obj: &'a T, callback: |&'a T| -> *c_char) -> Option<&'a str> {
     let chars = callback(obj);
 
     if unsafe { chars.is_null() || *chars == 0 } {
@@ -260,16 +260,11 @@ pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
     unsafe { mg_write(conn.unwrap(), c_bytes, bytes.len() as size_t) }
 }
 
-pub fn get_header(conn: &Connection, string: &str) -> Option<String> {
+pub fn get_header<'a>(conn: &'a Connection, string: &str) -> Option<&'a str> {
     let string = string.to_c_str();
-    let header = unsafe {
-        mg_get_header(conn.unwrap(), string.with_ref(|p| p))
-    };
-    if header.is_null() {
-        None
-    } else {
-        let header = unsafe { CString::new(header, false) };
-        header.as_str().map(|s| s.to_str())
+
+    unsafe {
+        to_slice(conn, |conn| mg_get_header(conn.unwrap(), string.with_ref(|p| p)))
     }
 }
 

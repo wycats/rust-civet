@@ -7,13 +7,16 @@ build = "make -f cargo.mk"
 
 [dependencies.route-recognizer]
 
-version = "0.1.0"
 git = "git://github.com/wycats/route-recognizer.rs"
 
-[[bin]]
+[dependencies.conduit]
 
-name = "channel_response"
-path = "examples/channel_response.rs"
+git = "https://github.com/wycats/conduit"
+
+#[[bin]]
+
+#name = "channel_response"
+#path = "examples/channel_response.rs"
 
 [[bin]]
 

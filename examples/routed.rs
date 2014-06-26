@@ -1,3 +1,4 @@
+extern crate conduit;
 extern crate civet;
 extern crate green;
 extern crate rustuv;
@@ -6,7 +7,8 @@ extern crate routing = "route_recognizer";
 use std::io::{IoResult, MemReader};
 use std::collections::HashMap;
 
-use civet::{Config, Server, Request, Response, Handler};
+use civet::{Config, Server, Response, Handler};
+use conduit::{Request};
 use routing::{Router, Params};
 
 struct MyServer {
@@ -15,7 +17,7 @@ struct MyServer {
 
 impl Handler for MyServer {
     fn call(&self, req: &mut Request) -> IoResult<Response> {
-        let hit = match self.router.recognize(req.url().unwrap_or("")) {
+        let hit = match self.router.recognize(req.path()) {
             Ok(m) => m,
             Err(e) => fail!("{}", e),
         };
