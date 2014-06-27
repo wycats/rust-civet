@@ -14,7 +14,7 @@ use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult, util};
 use std::collections::HashMap;
 
-use conduit::{Request, HeaderEntries, Handler};
+use conduit::{Request, HeaderEntries, Handler, Extensions};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
@@ -33,7 +33,8 @@ pub struct Connection<'a> {
 pub struct CivetRequest<'a> {
     conn: &'a raw::Connection,
     request_info: RequestInfo<'a>,
-    headers: Headers<'a>
+    headers: Headers<'a>,
+    extensions: Extensions
 }
 
 fn ver(major: uint, minor: uint) -> semver::Version {
@@ -119,6 +120,14 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     fn body<'a>(&'a mut self) -> &'a mut Reader {
         self as &mut Reader
     }
+
+    fn extensions<'a>(&'a self) -> &'a Extensions {
+        &self.extensions
+    }
+
+    fn mut_extensions<'a>(&'a mut self) -> &'a mut Extensions {
+        &mut self.extensions
+    }
 }
 
 pub fn response<S: ToStatusCode, R: Reader + Send>(status: S,
@@ -135,7 +144,13 @@ impl<'a> Connection<'a> {
     fn new<'a>(conn: &'a raw::Connection) -> Result<Connection<'a>, String> {
         match request_info(conn) {
             Ok(info) => {
-                let request = CivetRequest { conn: conn, request_info: info, headers: Headers { conn: conn } };
+                let request = CivetRequest {
+                    conn: conn,
+                    request_info: info,
+                    headers: Headers { conn: conn },
+                    extensions: HashMap::new()
+                };
+
                 Ok(Connection {
                     request: request,
                     written: false,
