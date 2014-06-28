@@ -5,15 +5,16 @@ extern crate conduit;
 extern crate green;
 extern crate rustuv;
 
-use std::io::{IoResult,MemReader,MemWriter};
+use std::io::{MemReader,MemWriter};
 use std::collections::HashMap;
+use std::fmt::Show;
 
 use civet::{Config, Server, response};
 use conduit::{Request, Response};
 
 macro_rules! http_write(
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
-        try!(write!($dst, concat!($fmt, "\r\n") $($arg)*))
+        try!(write!($dst, concat!($fmt, "\r\n") $($arg)*).map_err(|e| box e as Box<Show>))
     )
 )
 
@@ -40,7 +41,7 @@ fn wait_for_sigint() {
     pool.shutdown();
 }
 
-fn handler(req: &mut Request) -> IoResult<Response> {
+fn handler(req: &mut Request) -> Result<Response, Box<Show>> {
     let mut res = MemWriter::with_capacity(10000);
 
     http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
