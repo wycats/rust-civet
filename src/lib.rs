@@ -61,7 +61,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         ver(0, 1)
     }
 
-    fn method<'a>(&'a self) -> conduit::Method<'a> {
+    fn method(&self) -> conduit::Method {
         match self.request_info.method().unwrap() {
             "HEAD" => conduit::Head,
             "GET" => conduit::Get,
@@ -73,7 +73,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
             "CONNECT" => conduit::Connect,
             "OPTIONS" => conduit::Options,
             "TRACE" => conduit::Trace,
-            other @ _ => conduit::Other(other)
+            other @ _ => fail!("Civet does not support {} requests", other)
         }
     }
 
@@ -236,14 +236,14 @@ impl<'a> Iterator<(&'a str, Vec<&'a str>)> for HeaderIterator<'a> {
     }
 }
 
-pub struct Server<E>(raw::Server<Box<Handler<E> + 'static + Share>>);
+pub struct Server(raw::Server<Box<Handler + 'static + Share>>);
 
-impl<E> Server<E> {
-    pub fn start<H: Handler<E> + 'static + Share>(options: Config, handler: H)
-        -> IoResult<Server<E>>
+impl Server {
+    pub fn start<H: Handler + 'static + Share>(options: Config, handler: H)
+        -> IoResult<Server>
     {
-        fn internal_handler<E>(conn: &mut raw::Connection,
-                            handler: &Box<Handler<E>>) -> Result<(), ()> {
+        fn internal_handler(conn: &mut raw::Connection,
+                            handler: &Box<Handler>) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             let response = handler.call(&mut connection.request);
             let writer = &mut connection;
@@ -257,10 +257,12 @@ impl<E> Server<E> {
                 Err(_) => return Err(err(writer)),
             };
             let (code, string) = status;
-            try!(write!(writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
+            try!(write!(writer, "HTTP/1.1 {:u} {:s}\r\n", code, string).map_err(|_| ()));
 
             for (key, value) in headers.iter() {
-                try!(write!(writer, "{}: {}\r\n", key, value).map_err(|_| ()));
+                for header in value.iter() {
+                    try!(write!(writer, "{:s}: {:s}\r\n", *key, *header).map_err(|_| ()));
+                }
             }
 
             try!(write!(writer, "\r\n").map_err(|_| ()));

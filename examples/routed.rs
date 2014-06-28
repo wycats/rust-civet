@@ -4,8 +4,9 @@ extern crate green;
 extern crate rustuv;
 extern crate routing = "route_recognizer";
 
-use std::io::{IoResult, IoError, MemReader};
+use std::io::{IoResult, MemReader};
 use std::collections::HashMap;
+use std::fmt::Show;
 
 use civet::{Config, Server, response};
 use conduit::{Request, Response};
@@ -15,13 +16,13 @@ struct MyServer {
     router: Router<fn(&mut Request, &Params) -> IoResult<Response>>,
 }
 
-impl conduit::Handler<IoError> for MyServer {
-    fn call(&self, req: &mut Request) -> IoResult<Response> {
+impl conduit::Handler for MyServer {
+    fn call(&self, req: &mut Request) -> Result<Response, Box<Show>> {
         let hit = match self.router.recognize(req.path()) {
             Ok(m) => m,
             Err(e) => fail!("{}", e),
         };
-        (*hit.handler)(req, &hit.params)
+        (*hit.handler)(req, &hit.params).map_err(|e| box e as Box<Show>)
     }
 }
 
