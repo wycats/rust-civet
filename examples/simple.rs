@@ -68,5 +68,5 @@ fn handler(req: &mut Request) -> IoResult<Response> {
 
     let body = MemReader::new(res.unwrap());
 
-    Ok(response(200, headers, body))
+    Ok(response(200i, headers, body))
 }

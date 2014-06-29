@@ -56,12 +56,12 @@ fn wait_for_sigint() {
 
 fn root(_req: &mut Request, _params: &Params) -> IoResult<Response> {
     let bytes = "you found the root!\n".as_bytes().to_owned();
-    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
+    Ok(response(200i, HashMap::new(), MemReader::new(bytes)))
 }
 
 fn id(_req: &mut Request, params: &Params) -> IoResult<Response> {
     let string = format!("you found the id {}!\n", params["id"]);
     let bytes = string.into_bytes();
 
-    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
+    Ok(response(200i, HashMap::new(), MemReader::new(bytes)))
 }
