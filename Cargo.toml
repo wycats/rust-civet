@@ -7,7 +7,7 @@ build = "make -f cargo.mk"
 
 [dependencies.route-recognizer]
 
-git = "git://github.com/wycats/route-recognizer.rs"
+git = "https://github.com/wycats/route-recognizer.rs"
 
 [dependencies.conduit]
 
