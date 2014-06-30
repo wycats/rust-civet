@@ -304,8 +304,10 @@ mod test {
     use std::io::net::tcp::TcpStream;
     use std::io::test::next_test_ip4;
     use std::io::{IoResult, MemReader};
+    use std::fmt::Show;
     use std::sync::Mutex;
-    use super::{Server, Config, Request, Response, Handler};
+    use super::{Server, Config, response};
+    use conduit::{Request, Response, Handler};
 
     fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
 
@@ -336,7 +338,7 @@ mod test {
         static mut DROPPED: bool = false;
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
                 fail!()
             }
         }
@@ -353,10 +355,10 @@ mod test {
     fn invokes() {
         struct Foo(Mutex<Sender<()>>);
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
                 let Foo(ref tx) = *self;
                 tx.lock().send(());
-                Ok(Response::new(200, HashMap::new(), MemReader::new(vec![])))
+                Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
             }
         }
 
@@ -375,10 +377,10 @@ GET / HTTP/1.1
     fn header_sent() {
         struct Foo(Mutex<Sender<String>>);
         impl Handler for Foo {
-            fn call(&self, req: &mut Request) -> IoResult<Response> {
+            fn call(&self, req: &mut Request) -> Result<Response, Box<Show>> {
                 let Foo(ref tx) = *self;
-                tx.lock().send(req.get_header("Foo").unwrap());
-                Ok(Response::new(200, HashMap::new(), MemReader::new(vec![])))
+                tx.lock().send(req.headers().find("Foo").unwrap().connect(""));
+                Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
             }
         }
 
@@ -398,7 +400,7 @@ Foo: bar
     fn failing_handler() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
                 fail!()
             }
         }
@@ -416,7 +418,7 @@ Foo: bar
     fn failing_handler_is_500() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> IoResult<Response> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
                 fail!()
             }
         }

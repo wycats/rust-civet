@@ -96,7 +96,7 @@ fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> int {
     task.run(|| {
         let mut connection = Connection(conn);
         result = Some((callback.callback)(&mut connection, &callback.param));
-    });
+    }).destroy();
 
     match result {
         None => 0,
