@@ -13,10 +13,13 @@ install:
      find lib/rustlib/i686-unknown-linux-gnu/lib -type f >>
      lib/rustlib/manifest.in)
   - sudo ./rust-nightly-x86_64-unknown-linux-gnu/install.sh
+  - yes | sudo add-apt-repository ppa:cmrx64/cargo
+  - sudo apt-get update
+  - sudo apt-get install cargo
 script:
   - make CC="$CC" RUSTC="$RUSTC"
-  - make CC="$CC" RUSTC="$RUSTC" examples
-  - make CC="$CC" RUSTC="$RUSTC" check
+  - cargo build
+  - cargo test
 
 env:
   - ARCH=i686 CC='cc -m32' RUSTC='rustc --target=i686-unknown-linux-gnu'
