@@ -62,7 +62,7 @@ impl<T: 'static + Share> Server<T> {
             "num_threads".to_c_str(), threads.to_str().to_c_str(),
         );
         let mut ptrs: Vec<*const c_char> = options.iter().map(|a| {
-            a.with_ref(|p| p)
+            a.as_ptr()
         }).collect();
         ptrs.push(0 as *const c_char);
 
@@ -73,7 +73,7 @@ impl<T: 'static + Share> Server<T> {
         let uri = "**".to_c_str();
         let mut callback = box callback;
         unsafe {
-            mg_set_request_handler(context, uri.with_ref(|p| p),
+            mg_set_request_handler(context, uri.as_ptr(),
                                    raw_handler::<T>,
                                    &mut *callback as *mut _ as *mut c_void);
         }
@@ -259,7 +259,7 @@ pub fn get_header<'a>(conn: &'a Connection, string: &str) -> Option<&'a str> {
     let string = string.to_c_str();
 
     unsafe {
-        to_slice(conn, |conn| mg_get_header(conn.unwrap(), string.with_ref(|p| p)))
+        to_slice(conn, |conn| mg_get_header(conn.unwrap(), string.as_ptr()))
     }
 }
 
