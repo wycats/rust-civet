@@ -1,4 +1,4 @@
-#![crate_id="civet"]
+#![crate_name="civet"]
 #![crate_type="rlib"]
 #![feature(unsafe_destructor)]
 
@@ -282,7 +282,7 @@ fn write_bytes(connection: &raw::Connection, bytes: &[u8]) -> Result<(), String>
     let ret = raw::write(connection, bytes);
 
     if ret == -1 {
-        return Err("Couldn't write bytes to the connection".to_str())
+        return Err("Couldn't write bytes to the connection".to_string())
     }
 
     Ok(())
@@ -293,7 +293,7 @@ fn request_info<'a>(connection: &'a raw::Connection)
 {
     match get_request_info(connection) {
         Some(info) => Ok(info),
-        None => Err("Couldn't get request info for connection".to_str())
+        None => Err("Couldn't get request info for connection".to_string())
     }
 }
 
@@ -312,10 +312,10 @@ mod test {
     fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
 
     fn request(addr: SocketAddr, req: &str) -> String {
-        let mut s = TcpStream::connect(addr.ip.to_str().as_slice(),
+        let mut s = TcpStream::connect(addr.ip.to_string().as_slice(),
                                        addr.port).unwrap();
         s.write_str(req.trim_left()).unwrap();
-        s.read_to_str().unwrap()
+        s.read_to_string().unwrap()
     }
 
     #[test]

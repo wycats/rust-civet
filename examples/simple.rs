@@ -53,7 +53,7 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
     http_write!(res, "<p>Content Length: {}</p>", req.content_length());
 
-    http_write!(res, "<p>Input: {}", req.body().read_to_str());
+    http_write!(res, "<p>Input: {}", req.body().read_to_string());
 
     http_write!(res, "<h2>Headers</h2><ul>");
 
@@ -64,7 +64,7 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     http_write!(res, "</ul>");
 
     let mut headers = HashMap::new();
-    headers.insert("Content-Type".to_str(), vec!("text/html".to_str()));
+    headers.insert("Content-Type".to_string(), vec!("text/html".to_string()));
 
     let body = MemReader::new(res.unwrap());
 

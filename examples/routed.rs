@@ -2,7 +2,7 @@ extern crate conduit;
 extern crate civet;
 extern crate green;
 extern crate rustuv;
-extern crate routing = "route_recognizer";
+extern crate routing = "route-recognizer";
 
 use std::io::{IoResult, MemReader};
 use std::collections::HashMap;

@@ -58,8 +58,8 @@ impl<T: 'static + Share> Server<T> {
                  callback: ServerCallback<T>) -> io::IoResult<Server<T>> {
         let Config { port, threads } = options;
         let options = vec!(
-            "listening_ports".to_c_str(), port.to_str().to_c_str(),
-            "num_threads".to_c_str(), threads.to_str().to_c_str(),
+            "listening_ports".to_c_str(), port.to_string().to_c_str(),
+            "num_threads".to_c_str(), threads.to_string().to_c_str(),
         );
         let mut ptrs: Vec<*const c_char> = options.iter().map(|a| {
             a.as_ptr()
