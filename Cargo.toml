@@ -12,23 +12,3 @@ git = "https://github.com/conduit-rust/route-recognizer.rs"
 [dependencies.conduit]
 
 git = "https://github.com/conduit-rust/conduit"
-
-#[[bin]]
-
-#name = "channel_response"
-#path = "examples/channel_response.rs"
-
-[[bin]]
-
-name = "simple"
-path = "examples/simple.rs"
-
-[[bin]]
-
-name = "routed"
-path = "examples/routed.rs"
-
-[[lib]]
-
-name = "civet"
-path = "src/lib.rs"
