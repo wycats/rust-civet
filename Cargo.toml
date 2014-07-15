@@ -12,3 +12,8 @@ git = "https://github.com/conduit-rust/route-recognizer.rs"
 [dependencies.conduit]
 
 git = "https://github.com/conduit-rust/conduit"
+
+[[lib]]
+
+name = "civet"
+crate_type = ["rlib", "dylib"]
