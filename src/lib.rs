@@ -11,7 +11,7 @@ extern crate conduit;
 
 use std::io;
 use std::io::net::ip::{IpAddr, Ipv4Addr};
-use std::io::{IoResult, util};
+use std::io::{IoResult, util, BufferedWriter};
 use std::collections::HashMap;
 
 use conduit::{Request, HeaderEntries, Handler, Extensions};
@@ -246,7 +246,7 @@ impl Server {
                             handler: &Box<Handler>) -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             let response = handler.call(&mut connection.request);
-            let writer = &mut connection;
+            let mut writer = BufferedWriter::new(connection);
 
             fn err<W: Writer>(writer: &mut W) {
                 let _ = writeln!(writer, "HTTP/1.1 500 Internal Server Error");
@@ -254,20 +254,20 @@ impl Server {
 
             let conduit::Response { status, headers, mut body } = match response {
                 Ok(r) => r,
-                Err(_) => return Err(err(writer)),
+                Err(_) => return Err(err(&mut writer)),
             };
             let (code, string) = status;
-            try!(write!(writer, "HTTP/1.1 {:u} {:s}\r\n", code, string).map_err(|_| ()));
+            try!(write!(&mut writer, "HTTP/1.1 {:u} {:s}\r\n", code, string).map_err(|_| ()));
 
             for (key, value) in headers.iter() {
                 for header in value.iter() {
-                    try!(write!(writer, "{:s}: {:s}\r\n", *key, *header).map_err(|_| ()));
+                    try!(write!(&mut writer, "{:s}: {:s}\r\n", *key, *header).map_err(|_| ()));
                 }
             }
 
-            try!(write!(writer, "\r\n").map_err(|_| ()));
+            try!(write!(&mut writer, "\r\n").map_err(|_| ()));
             let mut body: &mut Reader = body;
-            try!(util::copy(&mut body, writer).map_err(|_| ()));
+            try!(util::copy(&mut body, &mut writer).map_err(|_| ()));
 
             Ok(())
         }
