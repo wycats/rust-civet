@@ -229,7 +229,7 @@ impl<'a> Iterator<(&'a str, Vec<&'a str>)> for HeaderIterator<'a> {
         if self.headers.len() <= pos {
             None
         } else {
-            let header = headers.get(pos);
+            let header = &headers[pos];
             self.position += 1;
             header.name().map(|name| (name, vec!(header.value().unwrap())))
         }

@@ -55,7 +55,7 @@ fn wait_for_sigint() {
 }
 
 fn root(_req: &mut Request, _params: &Params) -> IoResult<Response> {
-    let bytes = "you found the root!\n".as_bytes().to_owned();
+    let bytes = b"you found the root!\n".to_vec();
     Ok(response(200i, HashMap::new(), MemReader::new(bytes)))
 }
 
