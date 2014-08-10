@@ -57,9 +57,9 @@ fn handler(req: &mut Request) -> IoResult<Response> {
 
     http_write!(res, "<h2>Headers</h2><ul>");
 
-    for (key, value) in req.headers().iter() {
-        http_write!(res, "<li>{} = {}</li>", key, value);
-    }
+    // for (key, value) in req.headers().iter() {
+    //     http_write!(res, "<li>{} = {}</li>", key, value);
+    // }
 
     http_write!(res, "</ul>");
 
