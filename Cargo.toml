@@ -6,14 +6,10 @@ authors = ["wycats"]
 build = "make -f cargo.mk"
 
 [dev-dependencies.route-recognizer]
-
 git = "https://github.com/conduit-rust/route-recognizer.rs"
 
 [dependencies.conduit]
-
 git = "https://github.com/conduit-rust/conduit"
 
-[[lib]]
-
-name = "civet"
-crate_type = ["rlib", "dylib"]
+[dependencies.semver]
+git = "https://github.com/rust-lang/semver"

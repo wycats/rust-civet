@@ -236,10 +236,10 @@ impl<'a> Iterator<(&'a str, Vec<&'a str>)> for HeaderIterator<'a> {
     }
 }
 
-pub struct Server(raw::Server<Box<Handler + 'static + Share>>);
+pub struct Server(raw::Server<Box<Handler + 'static + Sync>>);
 
 impl Server {
-    pub fn start<H: Handler + 'static + Share>(options: Config, handler: H)
+    pub fn start<H: Handler + 'static + Sync>(options: Config, handler: H)
         -> IoResult<Server>
     {
         fn internal_handler(conn: &mut raw::Connection,

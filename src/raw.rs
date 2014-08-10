@@ -42,14 +42,14 @@ pub struct ServerCallback<T> {
     param: T,
 }
 
-impl<T: Share> ServerCallback<T> {
+impl<T: Sync> ServerCallback<T> {
     pub fn new(callback: fn(&mut Connection, &T) -> Result<(), ()>,
                param: T) -> ServerCallback<T> {
         ServerCallback { callback: callback, param: param }
     }
 }
 
-impl<T: 'static + Share> Server<T> {
+impl<T: 'static + Sync> Server<T> {
     fn as_ptr(&self) -> *mut MgContext {
         let Server(context, _) = *self; context
     }
@@ -82,7 +82,7 @@ impl<T: 'static + Share> Server<T> {
 }
 
 #[unsafe_destructor]
-impl<T: 'static + Share> Drop for Server<T> {
+impl<T: 'static + Sync> Drop for Server<T> {
     fn drop(&mut self) {
         unsafe { mg_stop(self.as_ptr()) }
     }
