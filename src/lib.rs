@@ -14,7 +14,7 @@ use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult, util, BufferedWriter};
 use std::collections::HashMap;
 
-use conduit::{Request, HeaderEntries, Handler, Extensions};
+use conduit::{Request, HeaderEntries, Handler, Extensions, TypeMap};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
@@ -148,7 +148,7 @@ impl<'a> Connection<'a> {
                     conn: conn,
                     request_info: info,
                     headers: Headers { conn: conn },
-                    extensions: HashMap::new()
+                    extensions: TypeMap::new()
                 };
 
                 Ok(Connection {
