@@ -243,7 +243,8 @@ impl Server {
         -> IoResult<Server>
     {
         fn internal_handler(conn: &mut raw::Connection,
-                            handler: &Box<Handler>) -> Result<(), ()> {
+                            handler: &Box<Handler + 'static + Sync>)
+                            -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             let response = handler.call(&mut connection.request);
             let mut writer = BufferedWriter::new(connection);
@@ -272,8 +273,8 @@ impl Server {
             Ok(())
         }
 
-        let raw_callback = raw::ServerCallback::new(internal_handler,
-                                                    box handler);
+        let handler = box handler;
+        let raw_callback = raw::ServerCallback::new(internal_handler, handler);
         Ok(Server(try!(raw::Server::start(options, raw_callback))))
     }
 }
@@ -338,7 +339,7 @@ mod test {
         static mut DROPPED: bool = false;
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 fail!()
             }
         }
@@ -355,7 +356,7 @@ mod test {
     fn invokes() {
         struct Foo(Mutex<Sender<()>>);
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 let Foo(ref tx) = *self;
                 tx.lock().send(());
                 Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
@@ -377,7 +378,7 @@ GET / HTTP/1.1
     fn header_sent() {
         struct Foo(Mutex<Sender<String>>);
         impl Handler for Foo {
-            fn call(&self, req: &mut Request) -> Result<Response, Box<Show>> {
+            fn call(&self, req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 let Foo(ref tx) = *self;
                 tx.lock().send(req.headers().find("Foo").unwrap().connect(""));
                 Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
@@ -400,7 +401,7 @@ Foo: bar
     fn failing_handler() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 fail!()
             }
         }
@@ -418,7 +419,7 @@ Foo: bar
     fn failing_handler_is_500() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 fail!()
             }
         }

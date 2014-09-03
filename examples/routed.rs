@@ -17,7 +17,7 @@ struct MyServer {
 }
 
 impl conduit::Handler for MyServer {
-    fn call(&self, req: &mut Request) -> Result<Response, Box<Show>> {
+    fn call(&self, req: &mut Request) -> Result<Response, Box<Show + 'static>> {
         let hit = match self.router.recognize(req.path()) {
             Ok(m) => m,
             Err(e) => fail!("{}", e),
