@@ -267,7 +267,7 @@ impl Server {
             }
 
             try!(write!(&mut writer, "\r\n").map_err(|_| ()));
-            let mut body: &mut Reader = body;
+            let mut body: &mut Reader = &mut *body;
             try!(util::copy(&mut body, &mut writer).map_err(|_| ()));
 
             Ok(())
