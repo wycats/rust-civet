@@ -124,11 +124,11 @@ impl ToStatusCode for int {
 impl ToStatusCode for uint {
     fn to_status(&self) -> Result<StatusCode, ()> {
         match *self {
-            num @ 102 .. 199 => Ok(Informational(num, "Informational")),
-            num @ 207 .. 299 => Ok(Successful(num, "Successful")),
-            num @ 306 | num @ 308 .. 399 => Ok(Redirection(num, "Redirection")),
-            num @ 402 | num @ 418 .. 499 => Ok(ClientError(num, "Client Error")),
-            num @ 506 .. 599 => Ok(ServerError(num, "Server Error")),
+            num @ 102 ... 199 => Ok(Informational(num, "Informational")),
+            num @ 207 ... 299 => Ok(Successful(num, "Successful")),
+            num @ 306 | num @ 308 ... 399 => Ok(Redirection(num, "Redirection")),
+            num @ 402 | num @ 418 ... 499 => Ok(ClientError(num, "Client Error")),
+            num @ 506 ... 599 => Ok(ServerError(num, "Server Error")),
             100 => Ok(Continue),
             101 => Ok(SwitchingProtocols),
             200 => Ok(OK),

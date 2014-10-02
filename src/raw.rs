@@ -3,7 +3,7 @@ use native;
 use std::c_str::CString;
 use std::io;
 use std::mem::transmute;
-use std::ptr::{null, mut_null};
+use std::ptr::{null, null_mut};
 use std;
 
 pub struct Config {
@@ -243,7 +243,7 @@ fn to_slice<'a, T>(obj: &'a T,
 }
 
 pub fn start(options: *const *mut c_char) -> *mut MgContext {
-    unsafe { mg_start(&MgCallbacks::new(), mut_null(), options) }
+    unsafe { mg_start(&MgCallbacks::new(), null_mut(), options) }
 }
 
 pub fn read(conn: &Connection, buf: &mut [u8]) -> i32 {
@@ -277,7 +277,7 @@ pub fn get_request_info<'a>(conn: &'a Connection) -> Option<RequestInfo<'a>> {
 pub fn get_headers<'a>(conn: &'a Connection) -> Vec<Header<'a>> {
     match get_request_info(conn) {
         Some(info) => unsafe {
-            (*info.as_ptr()).headers.mut_iter().map(|h| Header(h)).collect()
+            (*info.as_ptr()).headers.iter_mut().map(|h| Header(h)).collect()
         },
         None => vec!()
     }
