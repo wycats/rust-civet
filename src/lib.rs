@@ -3,7 +3,6 @@
 #![feature(unsafe_destructor)]
 
 extern crate libc;
-extern crate debug;
 extern crate native;
 extern crate collections;
 extern crate semver;
