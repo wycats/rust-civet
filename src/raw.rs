@@ -90,7 +90,7 @@ impl<T: 'static + Sync> Drop for Server<T> {
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> int {
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
-    let task = native::task::new((0, std::uint::MAX));
+    let task = native::task::new((0, std::uint::MAX), 0);
     let mut result = None;
 
     task.run(|| {
