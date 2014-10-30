@@ -72,7 +72,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
             "CONNECT" => conduit::Connect,
             "OPTIONS" => conduit::Options,
             "TRACE" => conduit::Trace,
-            other @ _ => fail!("Civet does not support {} requests", other)
+            other @ _ => panic!("Civet does not support {} requests", other)
         }
     }
 
@@ -339,7 +339,7 @@ mod test {
         struct Foo;
         impl Handler for Foo {
             fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
-                fail!()
+                panic!()
             }
         }
         impl Drop for Foo {
@@ -401,7 +401,7 @@ Foo: bar
         struct Foo;
         impl Handler for Foo {
             fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
-                fail!()
+                panic!()
             }
         }
 
@@ -419,7 +419,7 @@ Foo: bar
         struct Foo;
         impl Handler for Foo {
             fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
-                fail!()
+                panic!()
             }
         }
 
