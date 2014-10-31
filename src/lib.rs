@@ -13,7 +13,7 @@ use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult, util, BufferedWriter};
 use std::collections::HashMap;
 
-use conduit::{Request, HeaderEntries, Handler, Extensions, TypeMap};
+use conduit::{Request, Handler, Extensions, TypeMap};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
@@ -204,8 +204,8 @@ impl<'a> conduit::Headers for Headers<'a> {
         get_header(self.conn, string).is_some()
     }
 
-    fn iter<'a>(&'a self) -> conduit::HeaderEntries<'a> {
-        box HeaderIterator::new(self.conn) as conduit::HeaderEntries<'a>
+    fn all(&self) -> Vec<(&str, Vec<&str>)> {
+        HeaderIterator::new(self.conn).collect()
     }
 }
 
