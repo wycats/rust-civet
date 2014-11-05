@@ -3,7 +3,7 @@
 name = "civet"
 version = "0.1.0"
 authors = ["wycats"]
-build = "make -f cargo.mk"
+build = "build.rs"
 
 [dev-dependencies.route-recognizer]
 git = "https://github.com/conduit-rust/route-recognizer.rs"
