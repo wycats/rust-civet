@@ -3,13 +3,15 @@
 name = "civet"
 version = "0.1.0"
 authors = ["wycats"]
-build = "build.rs"
-
-[dev-dependencies.route-recognizer]
-git = "https://github.com/conduit-rust/route-recognizer.rs"
 
 [dependencies.conduit]
 git = "https://github.com/conduit-rust/conduit"
 
 [dependencies.semver]
 git = "https://github.com/rust-lang/semver"
+
+[dependencies.civet-sys]
+path = "civet-sys"
+
+[dev-dependencies.route-recognizer]
+git = "https://github.com/wycats/route-recognizer.rs"

@@ -7,6 +7,7 @@ extern crate native;
 extern crate collections;
 extern crate semver;
 extern crate conduit;
+extern crate "civet-sys" as ffi;
 
 use std::io;
 use std::io::net::ip::{IpAddr, Ipv4Addr};
@@ -312,8 +313,7 @@ mod test {
     fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
 
     fn request(addr: SocketAddr, req: &str) -> String {
-        let mut s = TcpStream::connect(addr.ip.to_string().as_slice(),
-                                       addr.port).unwrap();
+        let mut s = TcpStream::connect(addr).unwrap();
         s.write_str(req.trim_left()).unwrap();
         s.read_to_string().unwrap()
     }

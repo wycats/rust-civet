@@ -1,0 +1,11 @@
+[package]
+
+name = "civet-sys"
+version = "0.0.1"
+authors = ["Alex Crichton <alex@alexcrichton.com>"]
+links = "civet"
+build = "build.rs"
+
+[lib]
+name = "civet-sys"
+path = "lib.rs"

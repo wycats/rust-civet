@@ -6,7 +6,7 @@ fn main() {
     let dst = os::getenv("OUT_DIR").unwrap();
 
     assert!(Command::new("make")
-                    .cwd(&Path::new("src/civetweb"))
+                    .cwd(&Path::new("civetweb"))
                     .arg("lib")
                     .arg(format!("BUILD_DIR={}", dst))
                     .env("COPT", "-fPIC")
@@ -15,7 +15,7 @@ fn main() {
                     .status().unwrap().success());
 
     {
-        let src = Path::new("src/civetweb/libcivetweb.a");
+        let src = Path::new("civetweb/libcivetweb.a");
         let dst = Path::new(&dst).join("libcivetweb.a");
         if fs::rename(&src, &dst).is_err() {
             fs::copy(&src, &dst).unwrap();
