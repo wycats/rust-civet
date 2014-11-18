@@ -1,3 +1,5 @@
+pub use self::StatusCode::*;
+
 pub enum StatusCode {
     Informational(uint, &'static str),
     Continue,

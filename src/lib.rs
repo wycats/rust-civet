@@ -1,6 +1,6 @@
 #![crate_name="civet"]
 #![crate_type="rlib"]
-#![feature(unsafe_destructor)]
+#![feature(unsafe_destructor, globs)]
 
 extern crate libc;
 extern crate native;
