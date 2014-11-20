@@ -11,7 +11,7 @@ use conduit::{Request, Response};
 
 macro_rules! http_write(
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
-        try!(write!($dst, concat!($fmt, "\r\n") $($arg)*))
+        try!(write!(&mut $dst, concat!($fmt, "\r\n") $($arg)*))
     )
 )
 

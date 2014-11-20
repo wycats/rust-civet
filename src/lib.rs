@@ -258,11 +258,11 @@ impl Server {
                 Err(_) => return Err(err(&mut writer)),
             };
             let (code, string) = status;
-            try!(write!(&mut writer, "HTTP/1.1 {:u} {:s}\r\n", code, string).map_err(|_| ()));
+            try!(write!(&mut writer, "HTTP/1.1 {} {}\r\n", code, string).map_err(|_| ()));
 
             for (key, value) in headers.iter() {
                 for header in value.iter() {
-                    try!(write!(&mut writer, "{:s}: {:s}\r\n", *key, *header).map_err(|_| ()));
+                    try!(write!(&mut writer, "{}: {}\r\n", *key, *header).map_err(|_| ()));
                 }
             }
 
