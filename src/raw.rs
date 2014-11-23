@@ -1,10 +1,10 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
-use native;
 use std::c_str::CString;
 use std::io;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
 use std;
+use rustrt::task::Task;
 
 pub struct Config {
     pub port: u16,
@@ -89,7 +89,7 @@ impl<T: 'static + Sync> Drop for Server<T> {
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> int {
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
-    let task = native::task::new((0, std::uint::MAX), 0);
+    let task = box Task::new(None, None);
     let mut result = None;
 
     task.run(|| {
