@@ -14,7 +14,7 @@ use std::io::net::ip::{IpAddr, Ipv4Addr};
 use std::io::{IoResult, util, BufferedWriter};
 use std::collections::HashMap;
 
-use conduit::{Request, Handler, Extensions, TypeMap};
+use conduit::{Request, Handler, Extensions, TypeMap, Method, Scheme, Host};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
@@ -61,32 +61,32 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         ver(0, 1)
     }
 
-    fn method(&self) -> conduit::Method {
+    fn method(&self) -> Method {
         match self.request_info.method().unwrap() {
-            "HEAD" => conduit::Head,
-            "GET" => conduit::Get,
-            "POST" => conduit::Post,
-            "PUT" => conduit::Put,
-            "DELETE" => conduit::Delete,
-            "PATCH" => conduit::Patch,
-            "PURGE" => conduit::Purge,
-            "CONNECT" => conduit::Connect,
-            "OPTIONS" => conduit::Options,
-            "TRACE" => conduit::Trace,
+            "HEAD" => Method::Head,
+            "GET" => Method::Get,
+            "POST" => Method::Post,
+            "PUT" => Method::Put,
+            "DELETE" => Method::Delete,
+            "PATCH" => Method::Patch,
+            "PURGE" => Method::Purge,
+            "CONNECT" => Method::Connect,
+            "OPTIONS" => Method::Options,
+            "TRACE" => Method::Trace,
             other @ _ => panic!("Civet does not support {} requests", other)
         }
     }
 
-    fn scheme(&self) -> conduit::Scheme {
+    fn scheme(&self) -> Scheme {
         if self.request_info.is_ssl() {
-            conduit::Https
+            Scheme::Https
         } else {
-            conduit::Http
+            Scheme::Http
         }
     }
 
-    fn host<'a>(&'a self) -> conduit::Host<'a> {
-        conduit::HostName(get_header(self.conn, "Host").unwrap())
+    fn host<'a>(&'a self) -> Host<'a> {
+        Host::Name(get_header(self.conn, "Host").unwrap())
     }
 
     fn virtual_root<'a>(&'a self) -> Option<&'a str> {
