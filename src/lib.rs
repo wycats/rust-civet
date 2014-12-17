@@ -1,6 +1,7 @@
 #![crate_name="civet"]
 #![crate_type="rlib"]
 #![feature(unsafe_destructor, globs)]
+#![allow(missing_copy_implementations)]
 
 extern crate collections;
 extern crate conduit;
@@ -85,19 +86,19 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         }
     }
 
-    fn host<'a>(&'a self) -> Host<'a> {
+    fn host(&self) -> Host {
         Host::Name(get_header(self.conn, "Host").unwrap())
     }
 
-    fn virtual_root<'a>(&'a self) -> Option<&'a str> {
+    fn virtual_root(&self) -> Option<&str> {
         None
     }
 
-    fn path<'a>(&'a self) -> &'a str {
+    fn path(&self) -> &str {
         self.request_info.url().unwrap()
     }
 
-    fn query_string<'a>(&'a self) -> Option<&'a str> {
+    fn query_string(&self) -> Option<&str> {
         self.request_info.query_string()
     }
 
@@ -113,19 +114,19 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         get_header(self.conn, "Content-Length").and_then(from_str)
     }
 
-    fn headers<'a>(&'a self) -> &'a conduit::Headers {
+    fn headers(&self) -> &conduit::Headers {
         &self.headers as &conduit::Headers
     }
 
-    fn body<'a>(&'a mut self) -> &'a mut Reader {
+    fn body(&mut self) -> &mut Reader {
         self as &mut Reader
     }
 
-    fn extensions<'a>(&'a self) -> &'a Extensions {
+    fn extensions(&self) -> &Extensions {
         &self.extensions
     }
 
-    fn mut_extensions<'a>(&'a mut self) -> &'a mut Extensions {
+    fn mut_extensions(&mut self) -> &mut Extensions {
         &mut self.extensions
     }
 }
@@ -141,7 +142,7 @@ pub fn response<S: ToStatusCode, R: Reader + Send>(status: S,
 }
 
 impl<'a> Connection<'a> {
-    fn new<'a>(conn: &'a raw::Connection) -> Result<Connection<'a>, String> {
+    fn new(conn: &raw::Connection) -> Result<Connection, String> {
         match request_info(conn) {
             Ok(info) => {
                 let request = CivetRequest {
@@ -197,7 +198,7 @@ pub struct Headers<'a> {
 }
 
 impl<'a> conduit::Headers for Headers<'a> {
-    fn find<'a>(&'a self, string: &str) -> Option<Vec<&'a str>> {
+    fn find(&self, string: &str) -> Option<Vec<&str>> {
         get_header(self.conn, string).map(|s| vec!(s))
     }
 

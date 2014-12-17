@@ -159,7 +159,7 @@ struct MgRequestInfo {
 pub struct RequestInfo<'a>(*mut MgRequestInfo);
 
 impl<'a> RequestInfo<'a> {
-    pub fn as_ref<'a>(&'a self) -> &'a MgRequestInfo {
+    pub fn as_ref(&self) -> &MgRequestInfo {
         match *self { RequestInfo(info) => unsafe { &*info } }
     }
 
@@ -167,19 +167,19 @@ impl<'a> RequestInfo<'a> {
         match *self { RequestInfo(info) => info }
     }
 
-    pub fn method<'a>(&'a self) -> Option<&'a str> {
+    pub fn method(&self) -> Option<&str> {
         to_slice(self.as_ref(), |info| info.request_method)
     }
 
-    pub fn url<'a>(&'a self) -> Option<&'a str> {
+    pub fn url(&self) -> Option<&str> {
         to_slice(self.as_ref(), |info| info.uri)
     }
 
-    pub fn http_version<'a>(&'a self) -> Option<&'a str> {
+    pub fn http_version(&self) -> Option<&str> {
         to_slice(self.as_ref(), |info| info.http_version)
     }
 
-    pub fn query_string<'a>(&'a self) -> Option<&'a str> {
+    pub fn query_string(&self) -> Option<&str> {
         to_slice(self.as_ref(), |info| info.query_string)
     }
 
