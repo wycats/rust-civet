@@ -4,7 +4,7 @@ use std::io;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
 use std;
-use rustrt::task::Task;
+use std::rt::unwind;
 
 pub struct Config {
     pub port: u16,
@@ -89,18 +89,18 @@ impl<T: 'static + Sync> Drop for Server<T> {
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> int {
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
-    let task = box Task::new(None, None);
-    let mut result = None;
 
-    task.run(|| {
-        let mut connection = Connection(conn);
-        result = Some((callback.callback)(&mut connection, &callback.param));
-    }).destroy();
+    let mut ret = None;
+    let _ = unsafe {
+        unwind::try(|| {
+            let mut connection = Connection(conn);
+            ret = Some((callback.callback)(&mut connection, &callback.param));
+        })
+    };
 
-    match result {
+    match ret {
         None => 0,
-        Some(Err(_)) => 0,
-        Some(Ok(_)) => 1
+        Some(..) => 1,
     }
 }
 

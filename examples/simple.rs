@@ -9,11 +9,11 @@ use std::collections::HashMap;
 use civet::{Config, Server, response};
 use conduit::{Request, Response};
 
-macro_rules! http_write(
+macro_rules! http_write {
     ($dst:expr, $fmt:expr $($arg:tt)*) => (
         try!(write!(&mut $dst, concat!($fmt, "\r\n") $($arg)*))
     )
-)
+}
 
 fn main() {
     let _a = Server::start(Config { port: 8888, threads: 50 }, handler);
@@ -47,7 +47,7 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     let mut headers = HashMap::new();
     headers.insert("Content-Type".to_string(), vec!("text/html".to_string()));
 
-    let body = MemReader::new(res.unwrap());
+    let body = MemReader::new(res.into_inner());
 
     Ok(response(200i, headers, body))
 }

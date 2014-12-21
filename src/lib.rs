@@ -6,7 +6,6 @@
 extern crate collections;
 extern crate conduit;
 extern crate libc;
-extern crate rustrt;
 extern crate semver;
 extern crate "civet-sys" as ffi;
 
