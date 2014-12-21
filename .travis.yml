@@ -1,18 +1,5 @@
-before_install:
-  - sudo apt-get update
-  - sudo apt-get install gcc-multilib lib32stdc++6
-install:
-  - curl http://www.rust-lang.org/rustup.sh | sudo sh -
-  - curl -O http://static.rust-lang.org/dist/rust-nightly-$TARGET.tar.gz
-  - tar xf rust-nightly-$TARGET.tar.gz
-  - sudo ./rust-nightly-$TARGET/install.sh
+language: rust
+sudo: false
 script:
-  - cargo build --verbose --target $TARGET
+  - cargo build --verbose
   - cargo test --verbose
-env:
-  global:
-    - LD_LIBRARY_PATH=/usr/local/lib
-  matrix:
-    - TARGET=i686-unknown-linux-gnu CC="gcc -m32"
-    - TARGET=x86_64-unknown-linux-gnu
-
