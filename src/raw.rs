@@ -1,5 +1,5 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
-use std::c_str::CString;
+use std::c_str::{CString, ToCStr};
 use std::io;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
@@ -153,7 +153,7 @@ struct MgRequestInfo {
     conn_data: *mut c_void,
 
     num_headers: c_int,
-    headers: [MgHeader, ..64]
+    headers: [MgHeader; 64]
 }
 
 pub struct RequestInfo<'a>(*mut MgRequestInfo);

@@ -3,8 +3,9 @@
 extern crate civet;
 extern crate conduit;
 
-use std::io::{IoResult, MemReader, MemWriter};
 use std::collections::HashMap;
+use std::io::{IoResult, MemReader, MemWriter};
+use std::sync::mpsc::channel;
 
 use civet::{Config, Server, response};
 use conduit::{Request, Response};

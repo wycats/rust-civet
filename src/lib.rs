@@ -110,7 +110,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     }
 
     fn content_length(&self) -> Option<uint> {
-        get_header(self.conn, "Content-Length").and_then(from_str)
+        get_header(self.conn, "Content-Length").and_then(|s| s.parse())
     }
 
     fn headers(&self) -> &conduit::Headers {
@@ -301,12 +301,13 @@ fn request_info<'a>(connection: &'a raw::Connection)
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::fmt::Show;
     use std::io::net::ip::SocketAddr;
     use std::io::net::tcp::TcpStream;
     use std::io::test::next_test_ip4;
     use std::io::{IoResult, MemReader};
-    use std::fmt::Show;
     use std::sync::Mutex;
+    use std::sync::mpsc::{channel, Sender};
     use super::{Server, Config, response};
     use conduit::{Request, Response, Handler};
 
@@ -357,7 +358,7 @@ mod test {
         impl Handler for Foo {
             fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 let Foo(ref tx) = *self;
-                tx.lock().send(());
+                tx.lock().unwrap().send(()).unwrap();
                 Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
             }
         }
@@ -370,7 +371,7 @@ mod test {
 GET / HTTP/1.1
 
 ");
-        rx.recv();
+        rx.recv().unwrap();
     }
 
     #[test]
@@ -379,7 +380,8 @@ GET / HTTP/1.1
         impl Handler for Foo {
             fn call(&self, req: &mut Request) -> Result<Response, Box<Show + 'static>> {
                 let Foo(ref tx) = *self;
-                tx.lock().send(req.headers().find("Foo").unwrap().connect(""));
+                tx.lock().unwrap()
+                  .send(req.headers().find("Foo").unwrap().connect("")).unwrap();
                 Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
             }
         }
@@ -393,7 +395,7 @@ GET / HTTP/1.1
 Foo: bar
 
 ");
-        assert_eq!(rx.recv().as_slice(), "bar");
+        assert_eq!(rx.recv().unwrap().as_slice(), "bar");
     }
 
     #[test]

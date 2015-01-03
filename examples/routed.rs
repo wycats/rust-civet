@@ -2,9 +2,10 @@ extern crate conduit;
 extern crate civet;
 extern crate "route-recognizer" as routing;
 
-use std::io::{IoResult, MemReader};
 use std::collections::HashMap;
 use std::fmt::Show;
+use std::io::{IoResult, MemReader};
+use std::sync::mpsc::channel;
 
 use civet::{Config, Server, response};
 use conduit::{Request, Response};
