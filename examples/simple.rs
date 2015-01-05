@@ -19,7 +19,7 @@ macro_rules! http_write {
 fn main() {
     let _a = Server::start(Config { port: 8888, threads: 50 }, handler);
     let (_tx, rx) = channel::<()>();
-    rx.recv();
+    rx.recv().unwrap();
 }
 
 fn handler(req: &mut Request) -> IoResult<Response> {

@@ -1,6 +1,6 @@
 #![crate_name="civet"]
 #![crate_type="rlib"]
-#![feature(unsafe_destructor, globs)]
+#![feature(unsafe_destructor, globs, associated_types)]
 #![allow(missing_copy_implementations)]
 
 extern crate collections;
@@ -221,7 +221,8 @@ impl<'a> HeaderIterator<'a> {
     }
 }
 
-impl<'a> Iterator<(&'a str, Vec<&'a str>)> for HeaderIterator<'a> {
+impl<'a> Iterator for HeaderIterator<'a> {
+    type Item = (&'a str, Vec<&'a str>);
     fn next(&mut self) -> Option<(&'a str, Vec<&'a str>)> {
         let pos = self.position;
         let headers = &self.headers;
