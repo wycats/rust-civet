@@ -1,6 +1,6 @@
 #![crate_name="civet"]
 #![crate_type="rlib"]
-#![feature(unsafe_destructor, globs, associated_types)]
+#![feature(unsafe_destructor)]
 #![allow(missing_copy_implementations)]
 
 extern crate collections;

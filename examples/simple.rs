@@ -1,5 +1,3 @@
-#![feature(macro_rules)]
-
 extern crate civet;
 extern crate conduit;
 

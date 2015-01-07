@@ -1,9 +1,8 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
-use std::c_str::{CString, ToCStr};
+use std::ffi::{self, CString};
 use std::io;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
-use std;
 use std::rt::unwind;
 
 pub struct Config {
@@ -57,8 +56,10 @@ impl<T: 'static + Sync> Server<T> {
                  callback: ServerCallback<T>) -> io::IoResult<Server<T>> {
         let Config { port, threads } = options;
         let options = vec!(
-            "listening_ports".to_c_str(), port.to_string().to_c_str(),
-            "num_threads".to_c_str(), threads.to_string().to_c_str(),
+            CString::from_slice(b"listening_ports"),
+            CString::from_vec(port.to_string().into_bytes()),
+            CString::from_slice(b"num_threads"),
+            CString::from_vec(threads.to_string().into_bytes()),
         );
         let mut ptrs: Vec<*const c_char> = options.iter().map(|a| {
             a.as_ptr()
@@ -69,7 +70,7 @@ impl<T: 'static + Sync> Server<T> {
         // TODO: fill in this error
         if context.is_null() { return Err(io::standard_error(io::OtherIoError)) }
 
-        let uri = "**".to_c_str();
+        let uri = CString::from_slice(b"**");
         let mut callback = box callback;
         unsafe {
             mg_set_request_handler(context, uri.as_ptr(),
@@ -236,10 +237,8 @@ fn to_slice<'a, T, F>(obj: &'a T, mut callback: F) -> Option<&'a str>
         return None;
     }
 
-    let c_string = unsafe { CString::new(chars, false) };
-    let len = c_string.len();
-
-    unsafe { Some(transmute(std::raw::Slice { data: chars, len: len })) }
+    let c_string = unsafe { ffi::c_str_to_bytes(&chars) };
+    unsafe { Some(transmute(c_string)) }
 }
 
 pub fn start(options: *const *mut c_char) -> *mut MgContext {
@@ -256,7 +255,7 @@ pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
 }
 
 pub fn get_header<'a>(conn: &'a Connection, string: &str) -> Option<&'a str> {
-    let string = string.to_c_str();
+    let string = CString::from_slice(string.as_bytes());
 
     unsafe {
         to_slice(conn, |conn| mg_get_header(conn.unwrap(), string.as_ptr()))
