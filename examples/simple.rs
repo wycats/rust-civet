@@ -2,6 +2,7 @@ extern crate civet;
 extern crate conduit;
 
 use std::collections::HashMap;
+use std::error::Error;
 use std::io::{IoResult, MemReader, MemWriter};
 use std::sync::mpsc::channel;
 
@@ -9,13 +10,19 @@ use civet::{Config, Server, response};
 use conduit::{Request, Response};
 
 macro_rules! http_write {
-    ($dst:expr, $fmt:expr $($arg:tt)*) => (
-        try!(write!(&mut $dst, concat!($fmt, "\r\n") $($arg)*))
+    ($dst:expr, $fmt:expr) => (
+        try!(write!(&mut $dst, concat!($fmt, "\r\n")))
+    );
+    ($dst:expr, $fmt:expr, $($arg:tt)*) => (
+        try!(write!(&mut $dst, concat!($fmt, "\r\n"), $($arg)*))
     )
 }
 
 fn main() {
-    let _a = Server::start(Config { port: 8888, threads: 50 }, handler);
+    let _a = Server::start(Config { port: 8888, threads: 50 },
+                           |&: a: &mut Request| {
+        handler(a).map_err(|e| Box::new(e) as Box<Error>)
+    });
     let (_tx, rx) = channel::<()>();
     rx.recv().unwrap();
 }
@@ -25,15 +32,15 @@ fn handler(req: &mut Request) -> IoResult<Response> {
 
     http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
     http_write!(res, "<p>HTTP {}</p>", req.http_version());
-    http_write!(res, "<p>Method: {}</p>", req.method());
-    http_write!(res, "<p>Scheme: {}</p>", req.scheme());
-    http_write!(res, "<p>Host: {}</p>", req.host());
+    http_write!(res, "<p>Method: {:?}</p>", req.method());
+    http_write!(res, "<p>Scheme: {:?}</p>", req.scheme());
+    http_write!(res, "<p>Host: {:?}</p>", req.host());
     http_write!(res, "<p>Path: {}</p>", req.path());
-    http_write!(res, "<p>Query String: {}</p>", req.query_string());
+    http_write!(res, "<p>Query String: {:?}</p>", req.query_string());
     http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
-    http_write!(res, "<p>Content Length: {}</p>", req.content_length());
+    http_write!(res, "<p>Content Length: {:?}</p>", req.content_length());
 
-    http_write!(res, "<p>Input: {}", req.body().read_to_string());
+    http_write!(res, "<p>Input: {}", req.body().read_to_string().unwrap());
 
     http_write!(res, "<h2>Headers</h2><ul>");
 
@@ -48,5 +55,5 @@ fn handler(req: &mut Request) -> IoResult<Response> {
 
     let body = MemReader::new(res.into_inner());
 
-    Ok(response(200i, headers, body))
+    Ok(response(200, headers, body))
 }

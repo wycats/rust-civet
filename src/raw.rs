@@ -7,7 +7,7 @@ use std::rt::unwind;
 
 pub struct Config {
     pub port: u16,
-    pub threads: uint
+    pub threads: u32
 }
 
 impl Config {
@@ -71,7 +71,7 @@ impl<T: 'static + Sync> Server<T> {
         if context.is_null() { return Err(io::standard_error(io::OtherIoError)) }
 
         let uri = CString::from_slice(b"**");
-        let mut callback = box callback;
+        let mut callback = Box::new(callback);
         unsafe {
             mg_set_request_handler(context, uri.as_ptr(),
                                    raw_handler::<T>,
@@ -88,7 +88,7 @@ impl<T: 'static + Sync> Drop for Server<T> {
     }
 }
 
-fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> int {
+fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> i32 {
     let callback: &ServerCallback<T> = unsafe { transmute(param) };
 
     let mut ret = None;
@@ -115,7 +115,7 @@ impl Connection {
     }
 }
 
-type MgRequestHandler = fn(*mut MgConnection, *mut c_void) -> int;
+type MgRequestHandler = fn(*mut MgConnection, *mut c_void) -> i32;
 
 #[repr(C)]
 struct MgHeader {
@@ -184,8 +184,8 @@ impl<'a> RequestInfo<'a> {
         to_slice(self.as_ref(), |info| info.query_string)
     }
 
-    pub fn remote_ip(&self) -> int {
-        self.as_ref().remote_ip as int
+    pub fn remote_ip(&self) -> i32 {
+        self.as_ref().remote_ip as i32
     }
 
     pub fn is_ssl(&self) -> bool {

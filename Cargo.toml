@@ -1,14 +1,14 @@
 [project]
 
 name = "civet"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["wycats"]
 license = "MIT"
 description = "civetweb-based server implementation for conduit"
 repository = "https://github.com/wycats/rust-civet"
 
 [dependencies]
-conduit = "0.5.0"
+conduit = "0.6"
 semver = "0.1.0"
 
 [dependencies.civet-sys]

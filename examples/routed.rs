@@ -3,7 +3,7 @@ extern crate civet;
 extern crate "route-recognizer" as routing;
 
 use std::collections::HashMap;
-use std::fmt::Show;
+use std::error::Error;
 use std::io::{IoResult, MemReader};
 use std::sync::mpsc::channel;
 
@@ -16,12 +16,12 @@ struct MyServer {
 }
 
 impl conduit::Handler for MyServer {
-    fn call(&self, req: &mut Request) -> Result<Response, Box<Show + 'static>> {
+    fn call(&self, req: &mut Request) -> Result<Response, Box<Error>> {
         let hit = match self.router.recognize(req.path()) {
             Ok(m) => m,
             Err(e) => panic!("{}", e),
         };
-        (*hit.handler)(req, &hit.params).map_err(|e| box e as Box<Show>)
+        (*hit.handler)(req, &hit.params).map_err(|e| Box::new(e) as Box<Error>)
     }
 }
 
@@ -38,12 +38,12 @@ fn main() {
 
 fn root(_req: &mut Request, _params: &Params) -> IoResult<Response> {
     let bytes = b"you found the root!\n".to_vec();
-    Ok(response(200i, HashMap::new(), MemReader::new(bytes)))
+    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
 }
 
 fn id(_req: &mut Request, params: &Params) -> IoResult<Response> {
     let string = format!("you found the id {}!\n", params["id"]);
     let bytes = string.into_bytes();
 
-    Ok(response(200i, HashMap::new(), MemReader::new(bytes)))
+    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
 }

@@ -2,10 +2,10 @@ pub use self::StatusCode::*;
 
 #[derive(Copy)]
 pub enum StatusCode {
-    Informational(uint, &'static str),
+    Informational(u32, &'static str),
     Continue,
     SwitchingProtocols,
-    Successful(uint, &'static str),
+    Successful(u32, &'static str),
     OK,
     Created,
     Accepted,
@@ -13,7 +13,7 @@ pub enum StatusCode {
     NoContent,
     ResetContent,
     PartialContent,
-    Redirection(uint, &'static str),
+    Redirection(u32, &'static str),
     MultipleChoices,
     MovedPermanently,
     Found,
@@ -21,7 +21,7 @@ pub enum StatusCode {
     NotModified,
     UseProxy,
     TemporaryRedirect,
-    ClientError(uint, &'static str),
+    ClientError(u32, &'static str),
     BadRequest,
     Unauthorized,
     Forbidden,
@@ -39,18 +39,18 @@ pub enum StatusCode {
     UnsupportedMediaType,
     RequestedRangeNotSatisfiable,
     ExpectationFailed,
-    ServerError(uint, &'static str),
+    ServerError(u32, &'static str),
     InternalServerError,
     NotImplemented,
     BadGateway,
     ServiceUnavailable,
     GatewayTimeout,
     HttpVersionNotSupported,
-    Other(uint, &'static str),
+    Other(u32, &'static str),
 }
 
 impl StatusCode {
-    pub fn to_code(&self) -> (uint, &'static str) {
+    pub fn to_code(&self) -> (u32, &'static str) {
         match *self {
             Informational(num, string) |
                 Successful(num, string) |
@@ -111,20 +111,14 @@ impl ToStatusCode for StatusCode {
     }
 }
 
-impl ToStatusCode for (uint, &'static str) {
+impl ToStatusCode for (u32, &'static str) {
     fn to_status(&self) -> Result<StatusCode, ()> {
         let (code, name) = *self;
         Ok(Other(code, name))
     }
 }
 
-impl ToStatusCode for int {
-    fn to_status(&self) -> Result<StatusCode, ()> {
-        (*self as uint).to_status()
-    }
-}
-
-impl ToStatusCode for uint {
+impl ToStatusCode for u32 {
     fn to_status(&self) -> Result<StatusCode, ()> {
         match *self {
             num @ 102 ... 199 => Ok(Informational(num, "Informational")),

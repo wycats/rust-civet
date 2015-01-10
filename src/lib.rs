@@ -3,7 +3,6 @@
 #![feature(unsafe_destructor)]
 #![allow(missing_copy_implementations)]
 
-extern crate collections;
 extern crate conduit;
 extern crate libc;
 extern crate semver;
@@ -37,7 +36,7 @@ pub struct CivetRequest<'a> {
     extensions: Extensions
 }
 
-fn ver(major: uint, minor: uint) -> semver::Version {
+fn ver(major: u64, minor: u64) -> semver::Version {
     semver::Version {
         major: major,
         minor: minor,
@@ -109,7 +108,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
                  (ip >>  0) as u8)
     }
 
-    fn content_length(&self) -> Option<uint> {
+    fn content_length(&self) -> Option<u64> {
         get_header(self.conn, "Content-Length").and_then(|s| s.parse())
     }
 
@@ -136,7 +135,7 @@ pub fn response<S: ToStatusCode, R: Reader + Send>(status: S,
     conduit::Response {
         status: status.to_status().unwrap().to_code(),
         headers: headers,
-        body: box body as Box<Reader + Send>
+        body: Box::new(body),
     }
 }
 
@@ -172,13 +171,13 @@ impl<'a> Writer for Connection<'a> {
 }
 
 impl<'a> Reader for CivetRequest<'a> {
-    fn read(&mut self, buf: &mut[u8]) -> IoResult<uint> {
+    fn read(&mut self, buf: &mut[u8]) -> IoResult<usize> {
         let ret = raw::read(self.conn, buf);
 
         if ret == 0 {
             Err(io::standard_error(io::EndOfFile))
         } else {
-            Ok(ret as uint)
+            Ok(ret as usize)
         }
     }
 }
@@ -212,7 +211,7 @@ impl<'a> conduit::Headers for Headers<'a> {
 
 pub struct HeaderIterator<'a> {
     headers: Vec<Header<'a>>,
-    position: uint
+    position: usize
 }
 
 impl<'a> HeaderIterator<'a> {
@@ -274,7 +273,7 @@ impl Server {
             Ok(())
         }
 
-        let handler = box handler;
+        let handler = Box::new(handler);
         let raw_callback = raw::ServerCallback::new(internal_handler, handler);
         Ok(Server(try!(raw::Server::start(options, raw_callback))))
     }
@@ -302,7 +301,7 @@ fn request_info<'a>(connection: &'a raw::Connection)
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
-    use std::fmt::Show;
+    use std::error::Error;
     use std::io::net::ip::SocketAddr;
     use std::io::net::tcp::TcpStream;
     use std::io::test::next_test_ip4;
@@ -312,7 +311,7 @@ mod test {
     use super::{Server, Config, response};
     use conduit::{Request, Response, Handler};
 
-    fn noop(_: &mut Request) -> IoResult<Response> { unreachable!() }
+    fn noop(_: &mut Request) -> Result<Response, Box<Error>> { unreachable!() }
 
     fn request(addr: SocketAddr, req: &str) -> String {
         let mut s = TcpStream::connect(addr).unwrap();
@@ -340,7 +339,7 @@ mod test {
         static mut DROPPED: bool = false;
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
                 panic!()
             }
         }
@@ -357,10 +356,10 @@ mod test {
     fn invokes() {
         struct Foo(Mutex<Sender<()>>);
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap().send(()).unwrap();
-                Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
+                Ok(response(200, HashMap::new(), MemReader::new(vec![])))
             }
         }
 
@@ -379,11 +378,11 @@ GET / HTTP/1.1
     fn header_sent() {
         struct Foo(Mutex<Sender<String>>);
         impl Handler for Foo {
-            fn call(&self, req: &mut Request) -> Result<Response, Box<Show + 'static>> {
+            fn call(&self, req: &mut Request) -> Result<Response, Box<Error>> {
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap()
                   .send(req.headers().find("Foo").unwrap().connect("")).unwrap();
-                Ok(response(200i, HashMap::new(), MemReader::new(vec![])))
+                Ok(response(200, HashMap::new(), MemReader::new(vec![])))
             }
         }
 
@@ -403,7 +402,7 @@ Foo: bar
     fn failing_handler() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
                 panic!()
             }
         }
@@ -421,7 +420,7 @@ Foo: bar
     fn failing_handler_is_500() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Show + 'static>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
                 panic!()
             }
         }
