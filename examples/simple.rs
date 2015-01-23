@@ -21,7 +21,7 @@ macro_rules! http_write {
 fn main() {
     let _a = Server::start(Config { port: 8888, threads: 50 },
                            |&: a: &mut Request| {
-        handler(a).map_err(|e| Box::new(e) as Box<Error>)
+        handler(a).map_err(|e| Box::new(e) as Box<Error+Send>)
     });
     let (_tx, rx) = channel::<()>();
     rx.recv().unwrap();

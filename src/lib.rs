@@ -133,7 +133,7 @@ pub fn response<S: ToStatusCode, R: Reader + Send>(status: S,
     headers: HashMap<String, Vec<String>>, body: R) -> conduit::Response
 {
     conduit::Response {
-        status: status.to_status().unwrap().to_code(),
+        status: status.to_status().ok().unwrap().to_code(),
         headers: headers,
         body: Box::new(body),
     }
@@ -311,7 +311,7 @@ mod test {
     use super::{Server, Config, response};
     use conduit::{Request, Response, Handler};
 
-    fn noop(_: &mut Request) -> Result<Response, Box<Error>> { unreachable!() }
+    fn noop(_: &mut Request) -> Result<Response, Box<Error+Send>> { unreachable!() }
 
     fn request(addr: SocketAddr, req: &str) -> String {
         let mut s = TcpStream::connect(addr).unwrap();
@@ -339,7 +339,7 @@ mod test {
         static mut DROPPED: bool = false;
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 panic!()
             }
         }
@@ -356,7 +356,7 @@ mod test {
     fn invokes() {
         struct Foo(Mutex<Sender<()>>);
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap().send(()).unwrap();
                 Ok(response(200, HashMap::new(), MemReader::new(vec![])))
@@ -378,7 +378,7 @@ GET / HTTP/1.1
     fn header_sent() {
         struct Foo(Mutex<Sender<String>>);
         impl Handler for Foo {
-            fn call(&self, req: &mut Request) -> Result<Response, Box<Error>> {
+            fn call(&self, req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap()
                   .send(req.headers().find("Foo").unwrap().connect("")).unwrap();
@@ -402,7 +402,7 @@ Foo: bar
     fn failing_handler() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 panic!()
             }
         }
@@ -420,7 +420,7 @@ Foo: bar
     fn failing_handler_is_500() {
         struct Foo;
         impl Handler for Foo {
-            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error>> {
+            fn call(&self, _req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 panic!()
             }
         }

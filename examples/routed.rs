@@ -16,12 +16,12 @@ struct MyServer {
 }
 
 impl conduit::Handler for MyServer {
-    fn call(&self, req: &mut Request) -> Result<Response, Box<Error>> {
+    fn call(&self, req: &mut Request) -> Result<Response, Box<Error+Send>> {
         let hit = match self.router.recognize(req.path()) {
             Ok(m) => m,
             Err(e) => panic!("{}", e),
         };
-        (*hit.handler)(req, &hit.params).map_err(|e| Box::new(e) as Box<Error>)
+        (*hit.handler)(req, &hit.params).map_err(|e| Box::new(e) as Box<Error+Send>)
     }
 }
 
