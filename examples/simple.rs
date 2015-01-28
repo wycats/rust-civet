@@ -3,7 +3,7 @@ extern crate conduit;
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::io::{IoResult, MemReader, MemWriter};
+use std::old_io::{IoResult, MemReader, MemWriter};
 use std::sync::mpsc::channel;
 
 use civet::{Config, Server, response};

@@ -8,9 +8,9 @@ extern crate libc;
 extern crate semver;
 extern crate "civet-sys" as ffi;
 
-use std::io;
-use std::io::net::ip::{IpAddr, Ipv4Addr};
-use std::io::{IoResult, util, BufferedWriter};
+use std::old_io;
+use std::old_io::net::ip::{IpAddr, Ipv4Addr};
+use std::old_io::{IoResult, util, BufferedWriter};
 use std::collections::HashMap;
 
 use conduit::{Request, Handler, Extensions, TypeMap, Method, Scheme, Host};
@@ -162,10 +162,10 @@ impl<'a> Connection<'a> {
 }
 
 impl<'a> Writer for Connection<'a> {
-    fn write(&mut self, buf: &[u8]) -> IoResult<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         self.written = true;
         write_bytes(self.request.conn, buf).map_err(|_| {
-            io::standard_error(io::IoUnavailable)
+            old_io::standard_error(old_io::IoUnavailable)
         })
     }
 }
@@ -175,7 +175,7 @@ impl<'a> Reader for CivetRequest<'a> {
         let ret = raw::read(self.conn, buf);
 
         if ret == 0 {
-            Err(io::standard_error(io::EndOfFile))
+            Err(old_io::standard_error(old_io::EndOfFile))
         } else {
             Ok(ret as usize)
         }
@@ -302,10 +302,10 @@ fn request_info<'a>(connection: &'a raw::Connection)
 mod test {
     use std::collections::HashMap;
     use std::error::Error;
-    use std::io::net::ip::SocketAddr;
-    use std::io::net::tcp::TcpStream;
-    use std::io::test::next_test_ip4;
-    use std::io::{IoResult, MemReader};
+    use std::old_io::net::ip::SocketAddr;
+    use std::old_io::net::tcp::TcpStream;
+    use std::old_io::test::next_test_ip4;
+    use std::old_io::{IoResult, MemReader};
     use std::sync::Mutex;
     use std::sync::mpsc::{channel, Sender};
     use super::{Server, Config, response};

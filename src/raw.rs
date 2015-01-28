@@ -1,6 +1,6 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
 use std::ffi::{self, CString};
-use std::io;
+use std::old_io;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
 use std::rt::unwind;
@@ -53,7 +53,7 @@ impl<T: 'static + Sync> Server<T> {
     }
 
     pub fn start(options: Config,
-                 callback: ServerCallback<T>) -> io::IoResult<Server<T>> {
+                 callback: ServerCallback<T>) -> old_io::IoResult<Server<T>> {
         let Config { port, threads } = options;
         let options = vec!(
             CString::from_slice(b"listening_ports"),
@@ -68,7 +68,7 @@ impl<T: 'static + Sync> Server<T> {
 
         let context = start(ptrs.as_ptr() as *const _);
         // TODO: fill in this error
-        if context.is_null() { return Err(io::standard_error(io::OtherIoError)) }
+        if context.is_null() { return Err(old_io::standard_error(old_io::OtherIoError)) }
 
         let uri = CString::from_slice(b"**");
         let mut callback = Box::new(callback);

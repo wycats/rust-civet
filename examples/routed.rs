@@ -4,7 +4,7 @@ extern crate "route-recognizer" as routing;
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::io::{IoResult, MemReader};
+use std::old_io::{IoResult, MemReader};
 use std::sync::mpsc::channel;
 
 use civet::{Config, Server, response};

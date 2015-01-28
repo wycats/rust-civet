@@ -1,6 +1,6 @@
 use std::os;
-use std::io::{fs, Command};
-use std::io::process::InheritFd;
+use std::old_io::{fs, Command};
+use std::old_io::process::InheritFd;
 
 fn main() {
     let dst = os::getenv("OUT_DIR").unwrap();
