@@ -1,3 +1,5 @@
+#![feature(io, path, os)]
+
 use std::os;
 use std::old_io::{fs, Command};
 use std::old_io::process::InheritFd;

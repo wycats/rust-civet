@@ -1,3 +1,5 @@
+#![feature(io)]
+
 extern crate civet;
 extern crate conduit;
 

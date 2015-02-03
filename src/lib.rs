@@ -1,6 +1,4 @@
-#![crate_name="civet"]
-#![crate_type="rlib"]
-#![feature(unsafe_destructor)]
+#![feature(unsafe_destructor, io, core, std_misc, libc)]
 #![allow(missing_copy_implementations)]
 
 extern crate conduit;
@@ -109,7 +107,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     }
 
     fn content_length(&self) -> Option<u64> {
-        get_header(self.conn, "Content-Length").and_then(|s| s.parse())
+        get_header(self.conn, "Content-Length").and_then(|s| s.parse().ok())
     }
 
     fn headers(&self) -> &conduit::Headers {
@@ -305,7 +303,7 @@ mod test {
     use std::old_io::net::ip::SocketAddr;
     use std::old_io::net::tcp::TcpStream;
     use std::old_io::test::next_test_ip4;
-    use std::old_io::{IoResult, MemReader};
+    use std::old_io::{MemReader};
     use std::sync::Mutex;
     use std::sync::mpsc::{channel, Sender};
     use super::{Server, Config, response};

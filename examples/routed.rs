@@ -1,3 +1,5 @@
+#![feature(io)]
+
 extern crate conduit;
 extern crate civet;
 extern crate "route-recognizer" as routing;
