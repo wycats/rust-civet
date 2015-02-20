@@ -1,4 +1,4 @@
-#![feature(io)]
+#![feature(old_io, core)]
 
 extern crate conduit;
 extern crate civet;

@@ -1,10 +1,9 @@
-#![feature(io)]
+#![feature(old_io)]
 
 extern crate civet;
 extern crate conduit;
 
 use std::collections::HashMap;
-use std::error::Error;
 use std::old_io::{IoResult, MemReader, MemWriter};
 use std::sync::mpsc::channel;
 
@@ -21,10 +20,7 @@ macro_rules! http_write {
 }
 
 fn main() {
-    let _a = Server::start(Config { port: 8888, threads: 50 },
-                           |&: a: &mut Request| {
-        handler(a).map_err(|e| Box::new(e) as Box<Error+Send>)
-    });
+    let _a = Server::start(Config { port: 8888, threads: 50 }, handler);
     let (_tx, rx) = channel::<()>();
     rx.recv().unwrap();
 }

@@ -1,4 +1,5 @@
-#![feature(unsafe_destructor, io, core, std_misc, libc)]
+#![feature(unsafe_destructor, old_io, core, std_misc, libc)]
+#![cfg_attr(test, feature(io))]
 #![allow(missing_copy_implementations)]
 
 extern crate conduit;
@@ -127,7 +128,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     }
 }
 
-pub fn response<S: ToStatusCode, R: Reader + Send>(status: S,
+pub fn response<S: ToStatusCode, R: Reader + Send + 'static>(status: S,
     headers: HashMap<String, Vec<String>>, body: R) -> conduit::Response
 {
     conduit::Response {
@@ -305,11 +306,12 @@ mod test {
     use std::old_io::test::next_test_ip4;
     use std::old_io::{MemReader};
     use std::sync::Mutex;
+    use std::io;
     use std::sync::mpsc::{channel, Sender};
     use super::{Server, Config, response};
     use conduit::{Request, Response, Handler};
 
-    fn noop(_: &mut Request) -> Result<Response, Box<Error+Send>> { unreachable!() }
+    fn noop(_: &mut Request) -> Result<Response, io::Error> { unreachable!() }
 
     fn request(addr: SocketAddr, req: &str) -> String {
         let mut s = TcpStream::connect(addr).unwrap();

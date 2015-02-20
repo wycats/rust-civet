@@ -1,4 +1,4 @@
-#![feature(io, path, os)]
+#![feature(old_io, old_path, os)]
 
 use std::os;
 use std::old_io::{fs, Command};
