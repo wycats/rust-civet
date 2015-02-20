@@ -1,4 +1,4 @@
-#![feature(unsafe_destructor, old_io, core, std_misc, libc)]
+#![feature(unsafe_destructor, old_io, std_misc, libc)]
 #![cfg_attr(test, feature(io))]
 #![allow(missing_copy_implementations)]
 

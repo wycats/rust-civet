@@ -1,8 +1,10 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
-use std::ffi::{self, CString};
-use std::old_io;
+use std::ffi::{CStr, CString};
+use std::marker;
 use std::mem::transmute;
+use std::old_io;
 use std::ptr::{null, null_mut};
+use std::str;
 use std::rt::unwind;
 
 pub struct Config {
@@ -56,10 +58,10 @@ impl<T: 'static + Sync> Server<T> {
                  callback: ServerCallback<T>) -> old_io::IoResult<Server<T>> {
         let Config { port, threads } = options;
         let options = vec!(
-            CString::from_slice(b"listening_ports"),
-            CString::from_vec(port.to_string().into_bytes()),
-            CString::from_slice(b"num_threads"),
-            CString::from_vec(threads.to_string().into_bytes()),
+            CString::new("listening_ports").unwrap(),
+            CString::new(port.to_string()).unwrap(),
+            CString::new("num_threads").unwrap(),
+            CString::new(threads.to_string()).unwrap(),
         );
         let mut ptrs: Vec<*const c_char> = options.iter().map(|a| {
             a.as_ptr()
@@ -70,7 +72,7 @@ impl<T: 'static + Sync> Server<T> {
         // TODO: fill in this error
         if context.is_null() { return Err(old_io::standard_error(old_io::OtherIoError)) }
 
-        let uri = CString::from_slice(b"**");
+        let uri = CString::new("**").unwrap();
         let mut callback = Box::new(callback);
         unsafe {
             mg_set_request_handler(context, uri.as_ptr(),
@@ -123,11 +125,14 @@ struct MgHeader {
     value: *const c_char
 }
 
-pub struct Header<'a>(*mut MgHeader);
+pub struct Header<'a> {
+    ptr: *mut MgHeader,
+    _marker: marker::PhantomData<&'a str>,
+}
 
 impl<'a> Header<'a> {
     fn as_ref(&self) -> &'a MgHeader {
-        match *self { Header(header) => unsafe { &*header } }
+        unsafe { &*self.ptr }
     }
 
     pub fn name(&self) -> Option<&'a str> {
@@ -157,15 +162,18 @@ struct MgRequestInfo {
     headers: [MgHeader; 64]
 }
 
-pub struct RequestInfo<'a>(*mut MgRequestInfo);
+pub struct RequestInfo<'a> {
+    ptr: *mut MgRequestInfo,
+    _marker: marker::PhantomData<&'a str>,
+}
 
 impl<'a> RequestInfo<'a> {
     pub fn as_ref(&self) -> &MgRequestInfo {
-        match *self { RequestInfo(info) => unsafe { &*info } }
+        unsafe { &*self.as_ptr() }
     }
 
     fn as_ptr(&self) -> *mut MgRequestInfo {
-        match *self { RequestInfo(info) => info }
+        self.ptr
     }
 
     pub fn method(&self) -> Option<&str> {
@@ -237,8 +245,7 @@ fn to_slice<'a, T, F>(obj: &'a T, mut callback: F) -> Option<&'a str>
         return None;
     }
 
-    let c_string = unsafe { ffi::c_str_to_bytes(&chars) };
-    unsafe { Some(transmute(c_string)) }
+    Some(str::from_utf8(unsafe { CStr::from_ptr(chars).to_bytes() }).unwrap())
 }
 
 pub fn start(options: *const *mut c_char) -> *mut MgContext {
@@ -255,7 +262,7 @@ pub fn write(conn: &Connection, bytes: &[u8]) -> i32 {
 }
 
 pub fn get_header<'a>(conn: &'a Connection, string: &str) -> Option<&'a str> {
-    let string = CString::from_slice(string.as_bytes());
+    let string = CString::new(string).unwrap();
 
     unsafe {
         to_slice(conn, |conn| mg_get_header(conn.unwrap(), string.as_ptr()))
@@ -268,7 +275,7 @@ pub fn get_request_info<'a>(conn: &'a Connection) -> Option<RequestInfo<'a>> {
         if info.is_null() {
             None
         } else {
-            Some(RequestInfo(info))
+            Some(RequestInfo { ptr: info, _marker: marker::PhantomData })
         }
     }
 }
@@ -276,7 +283,9 @@ pub fn get_request_info<'a>(conn: &'a Connection) -> Option<RequestInfo<'a>> {
 pub fn get_headers<'a>(conn: &'a Connection) -> Vec<Header<'a>> {
     match get_request_info(conn) {
         Some(info) => unsafe {
-            (*info.as_ptr()).headers.iter_mut().map(|h| Header(h)).collect()
+            (*info.as_ptr()).headers.iter_mut().map(|h| {
+                Header { ptr: h, _marker: marker::PhantomData }
+            }).collect()
         },
         None => vec!()
     }

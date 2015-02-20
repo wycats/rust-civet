@@ -1,7 +1,7 @@
 [project]
 
 name = "civet"
-version = "0.1.12"
+version = "0.1.13"
 authors = ["wycats"]
 license = "MIT"
 description = "civetweb-based server implementation for conduit"
