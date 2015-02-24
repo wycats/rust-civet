@@ -1,16 +1,15 @@
-#![feature(unsafe_destructor, old_io, std_misc, libc)]
-#![cfg_attr(test, feature(io))]
-#![allow(missing_copy_implementations)]
+#![feature(unsafe_destructor, io, std_misc, libc, net)]
+#![cfg_attr(test, feature(core))]
 
 extern crate conduit;
 extern crate libc;
 extern crate semver;
 extern crate "civet-sys" as ffi;
 
-use std::old_io;
-use std::old_io::net::ip::{IpAddr, Ipv4Addr};
-use std::old_io::{IoResult, util, BufferedWriter};
 use std::collections::HashMap;
+use std::io::prelude::*;
+use std::io::{self, BufWriter};
+use std::net::IpAddr;
 
 use conduit::{Request, Handler, Extensions, TypeMap, Method, Scheme, Host};
 
@@ -101,10 +100,10 @@ impl<'a> conduit::Request for CivetRequest<'a> {
 
     fn remote_ip(&self) -> IpAddr {
         let ip = self.request_info.remote_ip();
-        Ipv4Addr((ip >> 24) as u8,
-                 (ip >> 16) as u8,
-                 (ip >>  8) as u8,
-                 (ip >>  0) as u8)
+        IpAddr::new_v4((ip >> 24) as u8,
+                       (ip >> 16) as u8,
+                       (ip >>  8) as u8,
+                       (ip >>  0) as u8)
     }
 
     fn content_length(&self) -> Option<u64> {
@@ -115,9 +114,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         &self.headers as &conduit::Headers
     }
 
-    fn body(&mut self) -> &mut Reader {
-        self as &mut Reader
-    }
+    fn body(&mut self) -> &mut Read { self as &mut Read }
 
     fn extensions(&self) -> &Extensions {
         &self.extensions
@@ -128,7 +125,7 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     }
 }
 
-pub fn response<S: ToStatusCode, R: Reader + Send + 'static>(status: S,
+pub fn response<S: ToStatusCode, R: Read + Send + 'static>(status: S,
     headers: HashMap<String, Vec<String>>, body: R) -> conduit::Response
 {
     conduit::Response {
@@ -160,23 +157,26 @@ impl<'a> Connection<'a> {
 
 }
 
-impl<'a> Writer for Connection<'a> {
-    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
+impl<'a> Write for Connection<'a> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.written = true;
-        write_bytes(self.request.conn, buf).map_err(|_| {
-            old_io::standard_error(old_io::IoUnavailable)
-        })
+        match raw::write(self.request.conn, buf) {
+            n if n < 0 => Err(io::Error::new(io::ErrorKind::Other,
+                                             "write error",
+                                             Some(format!("code: {}", n)))),
+            n => Ok(n as usize)
+        }
     }
+    fn flush(&mut self) -> io::Result<()> { Ok(()) }
 }
 
-impl<'a> Reader for CivetRequest<'a> {
-    fn read(&mut self, buf: &mut[u8]) -> IoResult<usize> {
-        let ret = raw::read(self.conn, buf);
-
-        if ret == 0 {
-            Err(old_io::standard_error(old_io::EndOfFile))
-        } else {
-            Ok(ret as usize)
+impl<'a> Read for CivetRequest<'a> {
+    fn read(&mut self, buf: &mut[u8]) -> io::Result<usize> {
+        match raw::read(self.conn, buf) {
+            n if n < 0 => Err(io::Error::new(io::ErrorKind::Other,
+                                             "read error",
+                                             Some(format!("code: {}", n)))),
+            n => Ok(n as usize)
         }
     }
 }
@@ -239,16 +239,16 @@ pub struct Server(raw::Server<Box<Handler + 'static + Sync>>);
 
 impl Server {
     pub fn start<H: Handler + 'static + Sync>(options: Config, handler: H)
-        -> IoResult<Server>
+        -> io::Result<Server>
     {
         fn internal_handler(conn: &mut raw::Connection,
                             handler: &Box<Handler + 'static + Sync>)
                             -> Result<(), ()> {
             let mut connection = Connection::new(conn).unwrap();
             let response = handler.call(&mut connection.request);
-            let mut writer = BufferedWriter::new(connection);
+            let mut writer = BufWriter::new(connection);
 
-            fn err<W: Writer>(writer: &mut W) {
+            fn err<W: Write>(writer: &mut W) {
                 let _ = writeln!(writer, "HTTP/1.1 500 Internal Server Error");
             }
 
@@ -266,8 +266,8 @@ impl Server {
             }
 
             try!(write!(&mut writer, "\r\n").map_err(|_| ()));
-            let mut body: &mut Reader = &mut *body;
-            try!(util::copy(&mut body, &mut writer).map_err(|_| ()));
+            let mut body: &mut Read = &mut *body;
+            try!(io::copy(&mut body, &mut writer).map_err(|_| ()));
 
             Ok(())
         }
@@ -276,16 +276,6 @@ impl Server {
         let raw_callback = raw::ServerCallback::new(internal_handler, handler);
         Ok(Server(try!(raw::Server::start(options, raw_callback))))
     }
-}
-
-fn write_bytes(connection: &raw::Connection, bytes: &[u8]) -> Result<(), String> {
-    let ret = raw::write(connection, bytes);
-
-    if ret == -1 {
-        return Err("Couldn't write bytes to the connection".to_string())
-    }
-
-    Ok(())
 }
 
 fn request_info<'a>(connection: &'a raw::Connection)
@@ -301,12 +291,11 @@ fn request_info<'a>(connection: &'a raw::Connection)
 mod test {
     use std::collections::HashMap;
     use std::error::Error;
-    use std::old_io::net::ip::SocketAddr;
-    use std::old_io::net::tcp::TcpStream;
-    use std::old_io::test::next_test_ip4;
-    use std::old_io::{MemReader};
+    use std::io::prelude::*;
+    use std::io::{self, Cursor};
+    use std::net::{SocketAddr, TcpStream, IpAddr};
     use std::sync::Mutex;
-    use std::io;
+    use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
     use std::sync::mpsc::{channel, Sender};
     use super::{Server, Config, response};
     use conduit::{Request, Response, Handler};
@@ -314,23 +303,29 @@ mod test {
     fn noop(_: &mut Request) -> Result<Response, io::Error> { unreachable!() }
 
     fn request(addr: SocketAddr, req: &str) -> String {
-        let mut s = TcpStream::connect(addr).unwrap();
-        s.write_str(req.trim_left()).unwrap();
-        s.read_to_string().unwrap()
+        let mut s = TcpStream::connect(&addr).unwrap();
+        s.write_all(req.trim_left().as_bytes()).unwrap();
+        let mut ret = String::new();
+        s.read_to_string(&mut ret).unwrap();
+        ret
+    }
+
+    fn port() -> u16 {
+        static CNT: AtomicUsize = ATOMIC_USIZE_INIT;
+        CNT.fetch_add(1, Ordering::SeqCst) as u16 + 13038
     }
 
     #[test]
     fn smoke() {
-        let addr = next_test_ip4();
-        Server::start(Config { port: addr.port, threads: 1 }, noop).unwrap();
+        Server::start(Config { port: port(), threads: 1 }, noop).unwrap();
     }
 
     #[test]
     fn dupe_port() {
-        let addr = next_test_ip4();
-        let s1 = Server::start(Config { port: addr.port, threads: 1 }, noop);
+        let port = port();
+        let s1 = Server::start(Config { port: port, threads: 1 }, noop);
         assert!(s1.is_ok());
-        let s2 = Server::start(Config { port: addr.port, threads: 1 }, noop);
+        let s2 = Server::start(Config { port: port, threads: 1 }, noop);
         assert!(s2.is_err());
     }
 
@@ -347,8 +342,7 @@ mod test {
             fn drop(&mut self) { unsafe { DROPPED = true; } }
         }
 
-        let addr = next_test_ip4();
-        drop(Server::start(Config { port: addr.port, threads: 1 }, Foo));
+        drop(Server::start(Config { port: port(), threads: 1 }, Foo));
         unsafe { assert!(DROPPED); }
     }
 
@@ -359,14 +353,15 @@ mod test {
             fn call(&self, _req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap().send(()).unwrap();
-                Ok(response(200, HashMap::new(), MemReader::new(vec![])))
+                Ok(response(200, HashMap::new(), Cursor::new(vec![])))
             }
         }
 
-        let addr = next_test_ip4();
         let (tx, rx) = channel();
         let handler = Foo(Mutex::new(tx));
-        let _s = Server::start(Config { port: addr.port, threads: 1 }, handler);
+        let port = port();
+        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let _s = Server::start(Config { port: port, threads: 1 }, handler);
         request(addr, r"
 GET / HTTP/1.1
 
@@ -382,14 +377,15 @@ GET / HTTP/1.1
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap()
                   .send(req.headers().find("Foo").unwrap().connect("")).unwrap();
-                Ok(response(200, HashMap::new(), MemReader::new(vec![])))
+                Ok(response(200, HashMap::new(), Cursor::new(vec![])))
             }
         }
 
-        let addr = next_test_ip4();
         let (tx, rx) = channel();
         let handler = Foo(Mutex::new(tx));
-        let _s = Server::start(Config { port: addr.port, threads: 1 }, handler);
+        let port = port();
+        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let _s = Server::start(Config { port: port, threads: 1 }, handler);
         request(addr, r"
 GET / HTTP/1.1
 Foo: bar
@@ -407,8 +403,9 @@ Foo: bar
             }
         }
 
-        let addr = next_test_ip4();
-        let _s = Server::start(Config { port: addr.port, threads: 1 }, Foo);
+        let port = port();
+        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let _s = Server::start(Config { port: port, threads: 1 }, Foo);
         request(addr, r"
 GET / HTTP/1.1
 Foo: bar
@@ -425,8 +422,9 @@ Foo: bar
             }
         }
 
-        let addr = next_test_ip4();
-        let _s = Server::start(Config { port: addr.port, threads: 1 }, Foo);
+        let port = port();
+        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let _s = Server::start(Config { port: port, threads: 1 }, Foo);
         let response = request(addr, r"
 GET / HTTP/1.1
 Foo: bar

@@ -1,19 +1,18 @@
-#![feature(old_io, old_path, os)]
+#![feature(fs, path, process, env)]
 
-use std::os;
-use std::old_io::{fs, Command};
-use std::old_io::process::InheritFd;
+use std::env;
+use std::fs;
+use std::process::Command;
+use std::path::Path;
 
 fn main() {
-    let dst = os::getenv("OUT_DIR").unwrap();
+    let dst = env::var("OUT_DIR").unwrap();
 
     assert!(Command::new("make")
-                    .cwd(&Path::new("civetweb"))
+                    .current_dir("civetweb")
                     .arg("lib")
-                    .arg(format!("BUILD_DIR={}", dst))
+                    .arg(&format!("BUILD_DIR={}", dst))
                     .env("COPT", "-fPIC")
-                    .stdout(InheritFd(1))
-                    .stderr(InheritFd(2))
                     .status().unwrap().success());
 
     {
@@ -21,7 +20,7 @@ fn main() {
         let dst = Path::new(&dst).join("libcivetweb.a");
         if fs::rename(&src, &dst).is_err() {
             fs::copy(&src, &dst).unwrap();
-            fs::unlink(&src).unwrap();
+            fs::remove_file(&src).unwrap();
         }
     }
 

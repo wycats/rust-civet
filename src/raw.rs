@@ -1,11 +1,11 @@
 use libc::{c_void,c_char,c_int,c_long,size_t};
 use std::ffi::{CStr, CString};
+use std::io;
 use std::marker;
 use std::mem::transmute;
-use std::old_io;
 use std::ptr::{null, null_mut};
-use std::str;
 use std::rt::unwind;
+use std::str;
 
 pub struct Config {
     pub port: u16,
@@ -55,7 +55,7 @@ impl<T: 'static + Sync> Server<T> {
     }
 
     pub fn start(options: Config,
-                 callback: ServerCallback<T>) -> old_io::IoResult<Server<T>> {
+                 callback: ServerCallback<T>) -> io::Result<Server<T>> {
         let Config { port, threads } = options;
         let options = vec!(
             CString::new("listening_ports").unwrap(),
@@ -70,7 +70,9 @@ impl<T: 'static + Sync> Server<T> {
 
         let context = start(ptrs.as_ptr() as *const _);
         // TODO: fill in this error
-        if context.is_null() { return Err(old_io::standard_error(old_io::OtherIoError)) }
+        if context.is_null() {
+            return Err(io::Error::new(io::ErrorKind::Other, "other error", None))
+        }
 
         let uri = CString::new("**").unwrap();
         let mut callback = Box::new(callback);

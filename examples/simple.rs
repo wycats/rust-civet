@@ -1,11 +1,12 @@
-#![feature(old_io)]
+#![feature(io)]
 
 extern crate civet;
 extern crate conduit;
 
 use std::collections::HashMap;
-use std::old_io::{IoResult, MemReader, MemWriter};
 use std::sync::mpsc::channel;
+use std::io::{self, Cursor};
+use std::io::prelude::*;
 
 use civet::{Config, Server, response};
 use conduit::{Request, Response};
@@ -25,8 +26,8 @@ fn main() {
     rx.recv().unwrap();
 }
 
-fn handler(req: &mut Request) -> IoResult<Response> {
-    let mut res = MemWriter::with_capacity(10000);
+fn handler(req: &mut Request) -> io::Result<Response> {
+    let mut res = Cursor::new(Vec::with_capacity(10000));
 
     http_write!(res, "<style>body {{ font-family: sans-serif; }}</style>");
     http_write!(res, "<p>HTTP {}</p>", req.http_version());
@@ -38,7 +39,9 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
     http_write!(res, "<p>Content Length: {:?}</p>", req.content_length());
 
-    http_write!(res, "<p>Input: {}", req.body().read_to_string().unwrap());
+    let mut body = String::new();
+    req.body().read_to_string(&mut body).unwrap();
+    http_write!(res, "<p>Input: {}", body);
 
     http_write!(res, "<h2>Headers</h2><ul>");
 
@@ -51,7 +54,7 @@ fn handler(req: &mut Request) -> IoResult<Response> {
     let mut headers = HashMap::new();
     headers.insert("Content-Type".to_string(), vec!("text/html".to_string()));
 
-    let body = MemReader::new(res.into_inner());
+    let body = Cursor::new(res.into_inner());
 
     Ok(response(200, headers, body))
 }

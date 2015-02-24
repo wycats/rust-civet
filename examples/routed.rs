@@ -1,4 +1,4 @@
-#![feature(old_io, core)]
+#![feature(io, core)]
 
 extern crate conduit;
 extern crate civet;
@@ -6,7 +6,7 @@ extern crate "route-recognizer" as routing;
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::old_io::{IoResult, MemReader};
+use std::io::{self, Cursor};
 use std::sync::mpsc::channel;
 
 use civet::{Config, Server, response};
@@ -14,7 +14,7 @@ use conduit::{Request, Response};
 use routing::{Router, Params};
 
 struct MyServer {
-    router: Router<fn(&mut Request, &Params) -> IoResult<Response>>,
+    router: Router<fn(&mut Request, &Params) -> io::Result<Response>>,
 }
 
 impl conduit::Handler for MyServer {
@@ -38,14 +38,14 @@ fn main() {
     rx.recv().unwrap();
 }
 
-fn root(_req: &mut Request, _params: &Params) -> IoResult<Response> {
+fn root(_req: &mut Request, _params: &Params) -> io::Result<Response> {
     let bytes = b"you found the root!\n".to_vec();
-    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
+    Ok(response(200, HashMap::new(), Cursor::new(bytes)))
 }
 
-fn id(_req: &mut Request, params: &Params) -> IoResult<Response> {
+fn id(_req: &mut Request, params: &Params) -> io::Result<Response> {
     let string = format!("you found the id {}!\n", params["id"]);
     let bytes = string.into_bytes();
 
-    Ok(response(200, HashMap::new(), MemReader::new(bytes)))
+    Ok(response(200, HashMap::new(), Cursor::new(bytes)))
 }
