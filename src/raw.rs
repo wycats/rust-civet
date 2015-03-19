@@ -198,6 +198,10 @@ impl<'a> RequestInfo<'a> {
         self.as_ref().remote_ip as i32
     }
 
+    pub fn remote_port(&self) -> u16 {
+        self.as_ref().remote_port as u16
+    }
+
     pub fn is_ssl(&self) -> bool {
         self.as_ref().is_ssl != 0
     }

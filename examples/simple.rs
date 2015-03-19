@@ -1,5 +1,3 @@
-#![feature(io)]
-
 extern crate civet;
 extern crate conduit;
 
@@ -36,7 +34,7 @@ fn handler(req: &mut Request) -> io::Result<Response> {
     http_write!(res, "<p>Host: {:?}</p>", req.host());
     http_write!(res, "<p>Path: {}</p>", req.path());
     http_write!(res, "<p>Query String: {:?}</p>", req.query_string());
-    http_write!(res, "<p>Remote IP: {}</p>", req.remote_ip());
+    http_write!(res, "<p>Remote address: {}</p>", req.remote_addr());
     http_write!(res, "<p>Content Length: {:?}</p>", req.content_length());
 
     let mut body = String::new();

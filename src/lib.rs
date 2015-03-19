@@ -1,4 +1,4 @@
-#![feature(unsafe_destructor, io, std_misc, libc, net)]
+#![feature(unsafe_destructor, io, std_misc)]
 #![cfg_attr(test, feature(core))]
 
 extern crate conduit;
@@ -9,7 +9,7 @@ extern crate "civet-sys" as ffi;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{self, BufWriter};
-use std::net::IpAddr;
+use std::net::{SocketAddr, Ipv4Addr, SocketAddrV4};
 
 use conduit::{Request, Handler, Extensions, TypeMap, Method, Scheme, Host};
 
@@ -98,12 +98,13 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         self.request_info.query_string()
     }
 
-    fn remote_ip(&self) -> IpAddr {
+    fn remote_addr(&self) -> SocketAddr {
         let ip = self.request_info.remote_ip();
-        IpAddr::new_v4((ip >> 24) as u8,
-                       (ip >> 16) as u8,
-                       (ip >>  8) as u8,
-                       (ip >>  0) as u8)
+        let ip = Ipv4Addr::new((ip >> 24) as u8,
+                               (ip >> 16) as u8,
+                               (ip >>  8) as u8,
+                               (ip >>  0) as u8);
+        SocketAddr::V4(SocketAddrV4::new(ip, self.request_info.remote_port()))
     }
 
     fn content_length(&self) -> Option<u64> {
@@ -293,7 +294,7 @@ mod test {
     use std::error::Error;
     use std::io::prelude::*;
     use std::io::{self, Cursor};
-    use std::net::{SocketAddr, TcpStream, IpAddr};
+    use std::net::{SocketAddr, TcpStream, SocketAddrV4, Ipv4Addr};
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
     use std::sync::mpsc::{channel, Sender};
@@ -360,7 +361,8 @@ mod test {
         let (tx, rx) = channel();
         let handler = Foo(Mutex::new(tx));
         let port = port();
-        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let ip = Ipv4Addr::new(127, 0, 0, 1);
+        let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(Config { port: port, threads: 1 }, handler);
         request(addr, r"
 GET / HTTP/1.1
@@ -384,7 +386,8 @@ GET / HTTP/1.1
         let (tx, rx) = channel();
         let handler = Foo(Mutex::new(tx));
         let port = port();
-        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let ip = Ipv4Addr::new(127, 0, 0, 1);
+        let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(Config { port: port, threads: 1 }, handler);
         request(addr, r"
 GET / HTTP/1.1
@@ -404,7 +407,8 @@ Foo: bar
         }
 
         let port = port();
-        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let ip = Ipv4Addr::new(127, 0, 0, 1);
+        let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(Config { port: port, threads: 1 }, Foo);
         request(addr, r"
 GET / HTTP/1.1
@@ -423,7 +427,8 @@ Foo: bar
         }
 
         let port = port();
-        let addr = SocketAddr::new(IpAddr::new_v4(127, 0, 0, 1), port);
+        let ip = Ipv4Addr::new(127, 0, 0, 1);
+        let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(Config { port: port, threads: 1 }, Foo);
         let response = request(addr, r"
 GET / HTTP/1.1
