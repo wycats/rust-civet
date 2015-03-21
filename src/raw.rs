@@ -33,7 +33,7 @@ extern {
     fn mg_get_request_info(connection: *mut MgConnection) -> *mut MgRequestInfo;
 }
 
-enum MgContext {}
+pub enum MgContext {}
 
 pub struct Server<T>(*mut MgContext, Box<ServerCallback<T>>);
 
