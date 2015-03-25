@@ -1,8 +1,6 @@
-#![feature(core)]
-
 extern crate conduit;
 extern crate civet;
-extern crate "route-recognizer" as routing;
+extern crate route_recognizer;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -11,7 +9,7 @@ use std::sync::mpsc::channel;
 
 use civet::{Config, Server, response};
 use conduit::{Request, Response};
-use routing::{Router, Params};
+use route_recognizer::{Router, Params};
 
 struct MyServer {
     router: Router<fn(&mut Request, &Params) -> io::Result<Response>>,

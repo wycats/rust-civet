@@ -1,10 +1,9 @@
 #![feature(unsafe_destructor, io, std_misc)]
-#![cfg_attr(test, feature(core))]
 
 extern crate conduit;
 extern crate libc;
 extern crate semver;
-extern crate "civet-sys" as ffi;
+extern crate civet_sys as ffi;
 
 use std::collections::HashMap;
 use std::io::prelude::*;
@@ -394,7 +393,7 @@ GET / HTTP/1.1
 Foo: bar
 
 ");
-        assert_eq!(rx.recv().unwrap().as_slice(), "bar");
+        assert_eq!(rx.recv().unwrap(), "bar");
     }
 
     #[test]
@@ -435,7 +434,7 @@ GET / HTTP/1.1
 Foo: bar
 
 ");
-        assert!(response.as_slice().contains("500 Internal"),
+        assert!(response.contains("500 Internal"),
                 "not a failing response: {}", response);
     }
 }
