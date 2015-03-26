@@ -35,7 +35,7 @@ extern {
 
 pub enum MgContext {}
 
-pub struct Server<T>(*mut MgContext, Box<ServerCallback<T>>);
+pub struct Server<T: Sync + 'static>(*mut MgContext, Box<ServerCallback<T>>);
 
 pub struct ServerCallback<T> {
     callback: fn(&mut Connection, &T) -> Result<(), ()>,

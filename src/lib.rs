@@ -110,15 +110,11 @@ impl<'a> conduit::Request for CivetRequest<'a> {
         get_header(self.conn, "Content-Length").and_then(|s| s.parse().ok())
     }
 
-    fn headers(&self) -> &conduit::Headers {
-        &self.headers as &conduit::Headers
-    }
+    fn headers(&self) -> &conduit::Headers { &self.headers }
 
-    fn body(&mut self) -> &mut Read { self as &mut Read }
+    fn body(&mut self) -> &mut Read { self }
 
-    fn extensions(&self) -> &Extensions {
-        &self.extensions
-    }
+    fn extensions(&self) -> &Extensions { &self.extensions }
 
     fn mut_extensions(&mut self) -> &mut Extensions {
         &mut self.extensions
