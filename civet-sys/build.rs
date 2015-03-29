@@ -22,5 +22,5 @@ fn main() {
         }
     }
 
-    println!("cargo:rustc-flags=-L {} -l civetweb:static", dst);
+    println!("cargo:rustc-flags=-L {} -l static=civetweb", dst);
 }
