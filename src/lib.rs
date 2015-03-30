@@ -1,4 +1,4 @@
-#![feature(unsafe_destructor, io, std_misc)]
+#![feature(io, std_misc)]
 
 extern crate conduit;
 extern crate libc;
@@ -177,7 +177,6 @@ impl<'a> Read for CivetRequest<'a> {
     }
 }
 
-#[unsafe_destructor]
 impl<'a> Drop for Connection<'a> {
     fn drop(&mut self) {
         if !self.written {

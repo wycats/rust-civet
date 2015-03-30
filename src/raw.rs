@@ -85,7 +85,6 @@ impl<T: 'static + Sync> Server<T> {
     }
 }
 
-#[unsafe_destructor]
 impl<T: 'static + Sync> Drop for Server<T> {
     fn drop(&mut self) {
         unsafe { mg_stop(self.as_ptr()) }
