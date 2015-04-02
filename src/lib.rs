@@ -1,4 +1,4 @@
-#![feature(io, std_misc)]
+#![feature(catch_panic)]
 
 extern crate conduit;
 extern crate libc;
@@ -158,8 +158,7 @@ impl<'a> Write for Connection<'a> {
         self.written = true;
         match raw::write(self.request.conn, buf) {
             n if n < 0 => Err(io::Error::new(io::ErrorKind::Other,
-                                             "write error",
-                                             Some(format!("code: {}", n)))),
+                                             &format!("write error ({})", n)[..])),
             n => Ok(n as usize)
         }
     }
@@ -170,8 +169,7 @@ impl<'a> Read for CivetRequest<'a> {
     fn read(&mut self, buf: &mut[u8]) -> io::Result<usize> {
         match raw::read(self.conn, buf) {
             n if n < 0 => Err(io::Error::new(io::ErrorKind::Other,
-                                             "read error",
-                                             Some(format!("code: {}", n)))),
+                                             &format!("read error ({})", n)[..])),
             n => Ok(n as usize)
         }
     }

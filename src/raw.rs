@@ -4,7 +4,7 @@ use std::io;
 use std::marker;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
-use std::rt::unwind;
+use std::thread;
 use std::str;
 
 pub struct Config {
@@ -71,7 +71,7 @@ impl<T: 'static + Sync> Server<T> {
         let context = start(ptrs.as_ptr() as *const _);
         // TODO: fill in this error
         if context.is_null() {
-            return Err(io::Error::new(io::ErrorKind::Other, "other error", None))
+            return Err(io::Error::new(io::ErrorKind::Other, "other error"))
         }
 
         let uri = CString::new("**").unwrap();
@@ -92,19 +92,21 @@ impl<T: 'static + Sync> Drop for Server<T> {
 }
 
 fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> i32 {
-    let callback: &ServerCallback<T> = unsafe { transmute(param) };
+    struct Env(*mut MgConnection, *mut c_void);
+    unsafe impl Send for Env {}
 
-    let mut ret = None;
-    let _ = unsafe {
-        unwind::try(|| {
-            let mut connection = Connection(conn);
-            ret = Some((callback.callback)(&mut connection, &callback.param));
-        })
-    };
+    let env = Env(conn, param);
+    let ret = thread::catch_panic(move || {
+        let Env(conn, param) = env;
+        let callback: &ServerCallback<T> = unsafe { transmute(param) };
+
+        let mut connection = Connection(conn);
+        (callback.callback)(&mut connection, &callback.param)
+    });
 
     match ret {
-        None => 0,
-        Some(..) => 1,
+        Err(..) => 0,
+        Ok(..) => 1,
     }
 }
 
