@@ -1,6 +1,6 @@
 pub use self::StatusCode::*;
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub enum StatusCode {
     Informational(u32, &'static str),
     Continue,
