@@ -16,9 +16,10 @@ use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
 use status::{ToStatusCode};
 
-pub use raw::Config;
+pub use config::Config;
 
 mod raw;
+mod config;
 pub mod status;
 
 pub struct Connection<'a> {
@@ -308,17 +309,23 @@ mod test {
         CNT.fetch_add(1, Ordering::SeqCst) as u16 + 13038
     }
 
+    fn cfg(port: u16) -> Config {
+        let mut cfg = Config::new();
+        cfg.port(port).threads(1);
+        return cfg
+    }
+
     #[test]
     fn smoke() {
-        Server::start(Config { port: port(), threads: 1 }, noop).unwrap();
+        Server::start(cfg(port()), noop).unwrap();
     }
 
     #[test]
     fn dupe_port() {
         let port = port();
-        let s1 = Server::start(Config { port: port, threads: 1 }, noop);
+        let s1 = Server::start(cfg(port), noop);
         assert!(s1.is_ok());
-        let s2 = Server::start(Config { port: port, threads: 1 }, noop);
+        let s2 = Server::start(cfg(port), noop);
         assert!(s2.is_err());
     }
 
@@ -335,7 +342,7 @@ mod test {
             fn drop(&mut self) { unsafe { DROPPED = true; } }
         }
 
-        drop(Server::start(Config { port: port(), threads: 1 }, Foo));
+        drop(Server::start(cfg(port()), Foo));
         unsafe { assert!(DROPPED); }
     }
 
@@ -355,7 +362,7 @@ mod test {
         let port = port();
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
-        let _s = Server::start(Config { port: port, threads: 1 }, handler);
+        let _s = Server::start(cfg(port), handler);
         request(addr, r"
 GET / HTTP/1.1
 
@@ -380,7 +387,7 @@ GET / HTTP/1.1
         let port = port();
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
-        let _s = Server::start(Config { port: port, threads: 1 }, handler);
+        let _s = Server::start(cfg(port), handler);
         request(addr, r"
 GET / HTTP/1.1
 Foo: bar
@@ -401,7 +408,7 @@ Foo: bar
         let port = port();
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
-        let _s = Server::start(Config { port: port, threads: 1 }, Foo);
+        let _s = Server::start(cfg(port), Foo);
         request(addr, r"
 GET / HTTP/1.1
 Foo: bar
@@ -421,7 +428,7 @@ Foo: bar
         let port = port();
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
-        let _s = Server::start(Config { port: port, threads: 1 }, Foo);
+        let _s = Server::start(cfg(port), Foo);
         let response = request(addr, r"
 GET / HTTP/1.1
 Foo: bar

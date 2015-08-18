@@ -19,7 +19,7 @@ macro_rules! http_write {
 }
 
 fn main() {
-    let _a = Server::start(Config { port: 8888, threads: 50 }, handler);
+    let _a = Server::start(Config::new(), handler);
     let (_tx, rx) = channel::<()>();
     rx.recv().unwrap();
 }

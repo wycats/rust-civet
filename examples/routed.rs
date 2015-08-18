@@ -31,7 +31,7 @@ fn main() {
     };
     server.router.add("/:id", id);
     server.router.add("/", root);
-    let _a = Server::start(Config { port: 8888, threads: 50 }, server);
+    let _a = Server::start(Config::new(), server);
     let (_tx, rx) = channel::<()>();
     rx.recv().unwrap();
 }

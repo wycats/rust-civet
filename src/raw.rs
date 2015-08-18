@@ -7,16 +7,7 @@ use std::ptr::{null, null_mut};
 use std::thread;
 use std::str;
 
-pub struct Config {
-    pub port: u16,
-    pub threads: u32
-}
-
-impl Config {
-    pub fn default() -> Config {
-        Config { port: 8888, threads: 50 }
-    }
-}
+use Config;
 
 extern {
     fn mg_start(callbacks: *const MgCallbacks, user_data: *mut c_void,
@@ -56,17 +47,7 @@ impl<T: 'static + Sync> Server<T> {
 
     pub fn start(options: Config,
                  callback: ServerCallback<T>) -> io::Result<Server<T>> {
-        let Config { port, threads } = options;
-        let options = vec!(
-            CString::new("listening_ports").unwrap(),
-            CString::new(port.to_string()).unwrap(),
-            CString::new("num_threads").unwrap(),
-            CString::new(threads.to_string()).unwrap(),
-        );
-        let mut ptrs: Vec<*const c_char> = options.iter().map(|a| {
-            a.as_ptr()
-        }).collect();
-        ptrs.push(0 as *const c_char);
+        let (_a, ptrs) = ::config::config_to_options(&options);
 
         let context = start(ptrs.as_ptr() as *const _);
         // TODO: fill in this error
