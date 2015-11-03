@@ -10,7 +10,7 @@ repository = "https://github.com/wycats/rust-civet"
 [dependencies]
 conduit = "0.7"
 semver = "0.1.0"
-libc = "0.1"
+libc = "0.2"
 
 [dependencies.civet-sys]
 path = "civet-sys"
