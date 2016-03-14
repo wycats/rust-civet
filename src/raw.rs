@@ -4,7 +4,7 @@ use std::io;
 use std::marker;
 use std::mem::transmute;
 use std::ptr::{null, null_mut};
-use std::thread;
+use std::panic;
 use std::str;
 
 use Config;
@@ -72,12 +72,13 @@ impl<T: 'static + Sync> Drop for Server<T> {
     }
 }
 
-fn raw_handler<T: 'static>(conn: *mut MgConnection, param: *mut c_void) -> i32 {
+extern fn raw_handler<T: 'static>(conn: *mut MgConnection,
+                                  param: *mut c_void) -> i32 {
     struct Env(*mut MgConnection, *mut c_void);
     unsafe impl Send for Env {}
 
     let env = Env(conn, param);
-    let ret = thread::catch_panic(move || {
+    let ret = panic::recover(move || {
         let Env(conn, param) = env;
         let callback: &ServerCallback<T> = unsafe { transmute(param) };
 
@@ -101,7 +102,7 @@ impl Connection {
     }
 }
 
-type MgRequestHandler = fn(*mut MgConnection, *mut c_void) -> i32;
+type MgRequestHandler = extern fn(*mut MgConnection, *mut c_void) -> i32;
 
 #[repr(C)]
 struct MgHeader {
@@ -129,7 +130,7 @@ impl<'a> Header<'a> {
 }
 
 #[repr(C)]
-struct MgRequestInfo {
+pub struct MgRequestInfo {
     request_method: *const c_char,
     uri: *const c_char,
     http_version: *const c_char,

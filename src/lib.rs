@@ -1,4 +1,4 @@
-#![feature(catch_panic)]
+#![feature(std_panic, recover)]
 
 extern crate conduit;
 extern crate libc;
@@ -377,7 +377,7 @@ GET / HTTP/1.1
             fn call(&self, req: &mut Request) -> Result<Response, Box<Error+Send>> {
                 let Foo(ref tx) = *self;
                 tx.lock().unwrap()
-                  .send(req.headers().find("Foo").unwrap().connect("")).unwrap();
+                  .send(req.headers().find("Foo").unwrap().join("")).unwrap();
                 Ok(response(200, HashMap::new(), Cursor::new(vec![])))
             }
         }
