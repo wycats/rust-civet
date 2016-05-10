@@ -78,7 +78,7 @@ extern fn raw_handler<T: 'static>(conn: *mut MgConnection,
     unsafe impl Send for Env {}
 
     let env = Env(conn, param);
-    let ret = panic::recover(move || {
+    let ret = panic::catch_unwind(move || {
         let Env(conn, param) = env;
         let callback: &ServerCallback<T> = unsafe { transmute(param) };
 

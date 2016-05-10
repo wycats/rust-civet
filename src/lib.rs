@@ -1,5 +1,3 @@
-#![feature(std_panic, recover)]
-
 extern crate conduit;
 extern crate libc;
 extern crate semver;
