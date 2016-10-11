@@ -8,7 +8,7 @@ use std::io::prelude::*;
 use std::io::{self, BufWriter};
 use std::net::{SocketAddr, Ipv4Addr, SocketAddrV4};
 
-use conduit::{Request, Handler, Extensions, TypeMap, Method, Scheme, Host};
+use conduit::{Handler, Extensions, TypeMap, Method, Scheme, Host};
 
 use raw::{RequestInfo,Header};
 use raw::{get_header,get_headers,get_request_info};
