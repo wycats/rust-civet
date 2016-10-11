@@ -8,8 +8,8 @@ description = "civetweb-based server implementation for conduit"
 repository = "https://github.com/wycats/rust-civet"
 
 [dependencies]
-conduit = "0.7"
-semver = "0.2.0"
+conduit = "0.8"
+semver = "0.5.0"
 libc = "0.2"
 
 [dependencies.civet-sys]
