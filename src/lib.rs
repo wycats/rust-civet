@@ -258,8 +258,7 @@ impl Server {
             }
 
             try!(write!(&mut writer, "\r\n").map_err(|_| ()));
-            let mut body: &mut Read = &mut *body;
-            try!(io::copy(&mut body, &mut writer).map_err(|_| ()));
+            try!(body.write_body(&mut writer).map_err(|_| ()));
 
             Ok(())
         }
