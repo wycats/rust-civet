@@ -1,4 +1,4 @@
-use libc::{c_void,c_char,c_int,c_long,size_t};
+use libc::{c_void,c_char,c_int,c_longlong,size_t};
 use std::ffi::{CStr, CString};
 use std::io;
 use std::marker;
@@ -132,11 +132,14 @@ impl<'a> Header<'a> {
 #[repr(C)]
 pub struct MgRequestInfo {
     request_method: *const c_char,
+    request_uri: *const c_char,
+    local_uri: *const c_char,
     uri: *const c_char,
     http_version: *const c_char,
     query_string: *const c_char,
     remote_user: *const c_char,
-    remote_ip: c_long,
+    remote_addr: [c_char; 48],
+    content_length: c_longlong,
     remote_port: c_int,
     is_ssl: c_int,
 
@@ -144,7 +147,10 @@ pub struct MgRequestInfo {
     conn_data: *mut c_void,
 
     num_headers: c_int,
-    headers: [MgHeader; 64]
+    headers: [MgHeader; 64],
+
+    client_cert: *mut c_void,
+    accepted_websocket_subprotocol: *const c_char
 }
 
 pub struct RequestInfo<'a> {
@@ -177,8 +183,12 @@ impl<'a> RequestInfo<'a> {
         to_slice(self.as_ref(), |info| info.query_string)
     }
 
-    pub fn remote_ip(&self) -> i32 {
-        self.as_ref().remote_ip as i32
+    pub fn remote_addr(&self) -> &str {
+        unsafe {
+            CStr::from_ptr(
+                self.as_ref().remote_addr.as_ptr()
+            ).to_str().unwrap_or("0.0.0.0")
+        }
     }
 
     pub fn remote_port(&self) -> u16 {
@@ -195,15 +205,15 @@ struct MgCallbacks {
     begin_request: *const c_void,
     end_request: *const c_void,
     log_message: *const c_void,
+    log_access: *const c_void,
     init_ssl: *const c_void,
-    websocket_connect: *const c_void,
-    websocket_ready: *const c_void,
-    websocket_data: *const c_void,
     connection_close: *const c_void,
     open_file: *const c_void,
     init_lua: *const c_void,
-    upload: *const c_void,
-    http_error: *const c_void
+    http_error: *const c_void,
+    init_context: *const c_void,
+    init_thread: *const c_void,
+    exit_context: *const c_void
 }
 
 impl MgCallbacks {
@@ -212,15 +222,15 @@ impl MgCallbacks {
             begin_request: null(),
             end_request: null(),
             log_message: null(),
+            log_access: null(),
             init_ssl: null(),
-            websocket_connect: null(),
-            websocket_ready: null(),
-            websocket_data: null(),
             connection_close: null(),
             open_file: null(),
             init_lua: null(),
-            upload: null(),
-            http_error: null()
+            http_error: null(),
+            init_context: null(),
+            init_thread: null(),
+            exit_context: null()
         }
     }
 }

@@ -1,26 +1,12 @@
-use std::env;
-use std::fs;
-use std::process::Command;
-use std::path::Path;
+extern crate cmake;
+
+use cmake::Config;
 
 fn main() {
-    let dst = env::var("OUT_DIR").unwrap();
-
-    assert!(Command::new("make")
-                    .current_dir("civetweb")
-                    .arg("lib")
-                    .arg(&format!("BUILD_DIR={}", dst))
-                    .env("COPT", "-fPIC")
-                    .status().unwrap().success());
-
-    {
-        let src = Path::new("civetweb/libcivetweb.a");
-        let dst = Path::new(&dst).join("libcivetweb.a");
-        if fs::rename(&src, &dst).is_err() {
-            fs::copy(&src, &dst).unwrap();
-            fs::remove_file(&src).unwrap();
-        }
-    }
-
-    println!("cargo:rustc-flags=-L {} -l static=civetweb", dst);
+    let mut dst = Config::new("civetweb")
+                         .define("CMAKE_BUILD_TYPE", "Release")
+                         .build();
+    dst.push("lib");
+    println!("cargo:rustc-link-search=native={}", dst.display());
+    println!("cargo:rustc-link-lib=static=civetweb");
 }

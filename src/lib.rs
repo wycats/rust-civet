@@ -6,7 +6,8 @@ extern crate civet_sys as ffi;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{self, BufWriter};
-use std::net::{SocketAddr, Ipv4Addr, SocketAddrV4};
+use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::str::FromStr;
 
 use conduit::{Handler, Extensions, TypeMap, Method, Scheme, Host};
 
@@ -97,12 +98,9 @@ impl<'a> conduit::Request for CivetRequest<'a> {
     }
 
     fn remote_addr(&self) -> SocketAddr {
-        let ip = self.request_info.remote_ip();
-        let ip = Ipv4Addr::new((ip >> 24) as u8,
-                               (ip >> 16) as u8,
-                               (ip >>  8) as u8,
-                               (ip >>  0) as u8);
-        SocketAddr::V4(SocketAddrV4::new(ip, self.request_info.remote_port()))
+        let ip = self.request_info.remote_addr();
+        let ip = IpAddr::from_str(ip).unwrap_or_else(|_| Ipv4Addr::new(0, 0, 0, 0).into());
+        SocketAddr::new(ip, self.request_info.remote_port())
     }
 
     fn content_length(&self) -> Option<u64> {
@@ -360,9 +358,9 @@ mod test {
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(cfg(port), handler);
-        request(addr, r"
-GET / HTTP/1.1
-
+        request(addr, "\r
+GET / HTTP/1.1\r
+\r
 ");
         rx.recv().unwrap();
     }
@@ -385,10 +383,10 @@ GET / HTTP/1.1
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(cfg(port), handler);
-        request(addr, r"
-GET / HTTP/1.1
-Foo: bar
-
+        request(addr, "\r
+GET / HTTP/1.1\r
+Foo: bar\r
+\r
 ");
         assert_eq!(rx.recv().unwrap(), "bar");
     }
@@ -406,10 +404,10 @@ Foo: bar
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(cfg(port), Foo);
-        request(addr, r"
-GET / HTTP/1.1
-Foo: bar
-
+        request(addr, "\r
+GET / HTTP/1.1\r
+Foo: bar\r
+\r
 ");
     }
 
@@ -426,10 +424,10 @@ Foo: bar
         let ip = Ipv4Addr::new(127, 0, 0, 1);
         let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
         let _s = Server::start(cfg(port), Foo);
-        let response = request(addr, r"
-GET / HTTP/1.1
-Foo: bar
-
+        let response = request(addr, "\r
+GET / HTTP/1.1\r
+Foo: bar\r
+\r
 ");
         assert!(response.contains("500 Internal"),
                 "not a failing response: {}", response);

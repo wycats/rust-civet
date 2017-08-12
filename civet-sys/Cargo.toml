@@ -12,3 +12,6 @@ description = "Native bindings to the libcivetweb library"
 [lib]
 name = "civet_sys"
 path = "lib.rs"
+
+[build-dependencies]
+cmake = "0.1"
