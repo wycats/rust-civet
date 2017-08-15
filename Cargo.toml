@@ -1,7 +1,7 @@
 [project]
 
 name = "civet"
-version = "0.9.1"
+version = "0.10.0"
 authors = ["wycats"]
 license = "MIT"
 description = "civetweb-based server implementation for conduit"
@@ -14,7 +14,7 @@ libc = "0.2"
 
 [dependencies.civet-sys]
 path = "civet-sys"
-version = "0.1.0"
+version = "0.2.0"
 
 [dev-dependencies]
 route-recognizer = "0.1.0"
