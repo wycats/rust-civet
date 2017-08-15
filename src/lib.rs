@@ -316,6 +316,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(target_os = "windows")]
     fn dupe_port() {
         let port = port();
         let s1 = Server::start(cfg(port), noop);
