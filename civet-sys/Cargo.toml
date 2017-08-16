@@ -1,7 +1,7 @@
 [package]
 
 name = "civet-sys"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 links = "civet"
 build = "build.rs"
@@ -12,3 +12,6 @@ description = "Native bindings to the libcivetweb library"
 [lib]
 name = "civet_sys"
 path = "lib.rs"
+
+[build-dependencies]
+cmake = "0.1"
