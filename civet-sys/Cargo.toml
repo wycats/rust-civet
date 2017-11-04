@@ -14,4 +14,4 @@ name = "civet_sys"
 path = "lib.rs"
 
 [build-dependencies]
-cmake = "0.1"
+cc = "1"
