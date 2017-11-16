@@ -134,7 +134,6 @@ pub struct MgRequestInfo {
     request_method: *const c_char,
     request_uri: *const c_char,
     local_uri: *const c_char,
-    uri: *const c_char,
     http_version: *const c_char,
     query_string: *const c_char,
     remote_user: *const c_char,
@@ -172,7 +171,7 @@ impl<'a> RequestInfo<'a> {
     }
 
     pub fn url(&self) -> Option<&str> {
-        to_slice(self.as_ref(), |info| info.uri)
+        to_slice(self.as_ref(), |info| info.local_uri)
     }
 
     pub fn http_version(&self) -> Option<&str> {
@@ -208,12 +207,12 @@ struct MgCallbacks {
     log_access: *const c_void,
     init_ssl: *const c_void,
     connection_close: *const c_void,
-    open_file: *const c_void,
     init_lua: *const c_void,
     http_error: *const c_void,
     init_context: *const c_void,
     init_thread: *const c_void,
-    exit_context: *const c_void
+    exit_context: *const c_void,
+    init_connection: *const c_void
 }
 
 impl MgCallbacks {
@@ -225,12 +224,12 @@ impl MgCallbacks {
             log_access: null(),
             init_ssl: null(),
             connection_close: null(),
-            open_file: null(),
             init_lua: null(),
             http_error: null(),
             init_context: null(),
             init_thread: null(),
-            exit_context: null()
+            exit_context: null(),
+            init_connection: null()
         }
     }
 }
